@@ -1,0 +1,3596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USEUCOM POAM Creator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --sidebar-bg: #2d4a52;
+    --sidebar-text: #e8f0f2;
+    --sidebar-accent: #4db8c8;
+    --timeline-bg: #f5f7f8;
+    --timeline-line: #4db8c8;
+    --phase-header: #2d4a52;
+    --current-date-line: #4db8c8;
+
+    /* Priority colors — palette mapped by contrast descending */
+    --priority-lowest-header:     #efede9;
+    --priority-lowest-border:     #efede9;
+    --priority-lowest-text:       #1d2333;
+
+    --priority-low-header:        #c8d7e8;
+    --priority-low-border:        #c8d7e8;
+    --priority-low-text:          #1d2333;
+
+    --priority-medium-header:     #8ca3bf;
+    --priority-medium-border:     #8ca3bf;
+    --priority-medium-text:       #1d2333;
+
+    --priority-medium-high-header: #2e3e5c;
+    --priority-medium-high-border: #2e3e5c;
+    --priority-medium-high-text:   #ffffff;
+
+    --priority-high-header:       #1d2333;
+    --priority-high-border:       #1d2333;
+    --priority-high-text:         #ffffff;
+
+    --priority-critical-header:   #f5a04b;
+    --priority-critical-border:   #f5a04b;
+    --priority-critical-text:     #1d2333;
+
+    --priority-emergency-header:  #c6530c;
+    --priority-emergency-border:  #c6530c;
+    --priority-emergency-text:    #ffffff;
+
+    --missed-color: #c6530c;
+    --card-bg: #fff;
+    --card-radius: 6px;
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: #e8edf0;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    color: #2d3a40;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 16px;
+    gap: 20px;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  .sidebar-title { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  .sidebar-subtitle { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+
+  .sidebar-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.65;
+    margin-bottom: 6px;
+  }
+
+  .sidebar select, .sidebar input[type="text"], .sidebar textarea, .sidebar input[type="date"] {
+    width: 100%;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.26);
+    color: var(--sidebar-text);
+    border-radius: 7px;
+    padding: 8px 10px;
+    font-family: var(--font);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .sidebar select:focus, .sidebar input:focus, .sidebar textarea:focus {
+    border-color: var(--sidebar-accent);
+    background: rgba(255,255,255,0.16);
+    box-shadow: 0 0 0 2px rgba(77,184,200,0.15);
+  }
+  .sidebar select option { background: #2d4a52; }
+  .sidebar textarea { resize: vertical; min-height: 80px; }
+  .sidebar input::placeholder, .sidebar textarea::placeholder { color: rgba(232,240,242,0.72); }
+  .char-limit { font-size: 10px; opacity: 0.55; text-align: right; margin-top: 2px; }
+
+  /* Primary entry fields — teal left-border accent to draw the eye */
+  #new-name, #new-desc {
+    border-left: 3px solid rgba(77,184,200,0.55);
+    padding-left: 9px;
+  }
+  #new-name:focus, #new-desc:focus {
+    border-left-color: var(--sidebar-accent);
+  }
+
+  /* Field label above Event Name / Description */
+  .sidebar-field-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(77,184,200,0.85);
+    margin-bottom: 4px;
+  }
+
+  /* Validation toast */
+  .validation-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    background: #1d2333;
+    border: 1px solid rgba(77,184,200,0.4);
+    border-left: 4px solid #f5a04b;
+    color: #e8f0f2;
+    font-family: var(--font);
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 10px 18px 10px 14px;
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .validation-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .validation-toast .toast-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  /* Sidebar custom scrollbar */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(77,184,200,0.25); border-radius: 2px; }
+  .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(77,184,200,0.45); }
+
+  .btn-add {
+    background: var(--sidebar-accent);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 9px 14px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    display: flex; align-items: center; gap: 6px; justify-content: center;
+    box-shadow: 0 2px 8px rgba(77,184,200,0.3);
+  }
+  .btn-add:hover { background: #3aa6b8; box-shadow: 0 4px 12px rgba(77,184,200,0.4); }
+  .btn-add:active { transform: scale(0.97); box-shadow: none; }
+
+  .create-new {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sidebar-accent);
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .filter-list { display: flex; flex-direction: column; gap: 6px; }
+  .filter-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; cursor: pointer;
+  }
+  .filter-item input[type="checkbox"] { accent-color: var(--sidebar-accent); }
+  .filter-item span { color: var(--sidebar-accent); }
+
+  /* MAIN */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* TIMELINE WRAPPER */
+  .timeline-wrapper {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 24px 24px 0;
+    position: relative;
+  }
+
+  .timeline-canvas {
+    min-width: 1200px;
+    height: 100%;
+    position: relative;
+  }
+
+  /* ZOOM CONTROLS */
+  .zoom-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .zoom-btn {
+    background: none;
+    border: none;
+    color: var(--sidebar-accent);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    line-height: 1;
+    transition: background 0.15s, transform 0.1s;
+    font-family: var(--font);
+  }
+  .zoom-btn:hover { background: rgba(77,184,200,0.15); }
+  .zoom-btn:active { transform: scale(0.9); }
+  .zoom-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sidebar-text);
+    min-width: 44px;
+    text-align: center;
+  }
+
+  /* Phase headers — populated by JS to match band positions */
+  .phase-regions {
+    display: block;
+    position: relative;
+    height: 36px;
+    border-bottom: 2px solid #d0dde0;
+    overflow: hidden;
+  }
+  .phase-region {
+    position: absolute;
+    top: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--phase-header);
+    border-right: 1px solid #d0dde0;
+  }
+  .phase-region:last-child { border-right: none; }
+  .phase-region.odd-phase  { background: #eef2f5; }
+  .phase-region.even-phase { background: #dce6ee; }
+
+  /* Timeline area */
+  .timeline-area {
+    position: relative;
+    height: calc(100% - 36px);
+    background: #edf1f4;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  /* Phase background bands */
+  .phase-band {
+    position: absolute;
+    top: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .phase-band.odd  { background: #eef2f5; }
+  .phase-band.even { background: #dce6ee; }
+
+  /* Date ticks on the center line */
+  .date-tick {
+    position: absolute;
+    top: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .date-tick-line {
+    width: 1px;
+    height: 8px;
+    background: rgba(46, 62, 92, 0.25);
+    margin-top: -4px;
+  }
+  .date-tick-label {
+    font-size: 9px;
+    font-weight: 600;
+    font-family: var(--mono);
+    color: rgba(46, 62, 92, 0.4);
+    letter-spacing: 0.04em;
+    margin-top: 3px;
+    white-space: nowrap;
+  }
+  .date-tick-minor .date-tick-line {
+    height: 5px;
+    background: rgba(46, 62, 92, 0.12);
+  }
+
+  /* Month labels */
+  .month-markers {
+    position: absolute;
+    bottom: 60px;
+    left: 0; right: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  .month-marker {
+    position: absolute;
+    transform: translateX(0);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(45,74,82,0.15);
+    font-family: var(--mono);
+  }
+
+  /* The horizontal timeline line */
+  .timeline-line {
+    position: absolute;
+    top: 50%;
+    left: 0; right: 0;
+    height: 1.5px;
+    background: var(--timeline-line);
+    transform: translateY(-50%);
+    opacity: 0.9;
+  }
+
+  /* Current date indicator */
+  .current-date-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: var(--current-date-line);
+    opacity: 0.7;
+    left: 32%;
+  }
+  .current-date-label {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    color: var(--timeline-line);
+    white-space: nowrap;
+    font-family: var(--mono);
+    opacity: 0.9;
+  }
+
+  /* EVENT NODE on the timeline line */
+  .event-node {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  .event-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--timeline-line);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px var(--timeline-line);
+    transition: transform 0.15s;
+    position: relative; z-index: 3;
+  }
+  .event-node:hover .event-dot { transform: scale(1.4); }
+
+  /* stem connecting dot to card */
+  .event-stem {
+    position: absolute;
+    left: 50%;
+    width: 1.5px;
+    background: #b0c8cf;
+    transform: translateX(-50%);
+    z-index: 1;
+  }
+  .event-stem.up { bottom: 100%; }
+  .event-stem.down { top: 100%; }
+
+  /* EVENT CARD */
+  .event-card {
+    position: absolute;
+    width: 175px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.07), 0 6px 20px rgba(0,0,0,0.08), 0 0 0 1.5px var(--card-border-color, #a8dce8);
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
+  .event-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 12px 32px rgba(0,0,0,0.12), 0 0 0 2px var(--card-border-color, #a8dce8);
+    transform: translateX(-50%) translateY(-2px);
+    z-index: 20;
+  }
+  .event-card.above { bottom: calc(100% + 2px); }
+  .event-card.below { top: calc(100% + 2px); }
+
+  .event-card-header {
+    padding: 6px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    background: var(--card-header-color, #a8dce8);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 5px;
+  }
+  .event-card-header .event-name-text {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.4;
+  }
+  .emergency-icon {
+    width: 16px; height: 16px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Light priority headers use dark text — handled inline via priorityConfig */
+
+  .event-card-body {
+    padding: 8px 10px 10px;
+  }
+  .event-card-date {
+    font-size: 11px;
+    font-weight: 600;
+    color: #2d3a40;
+    font-family: var(--mono);
+    letter-spacing: 0.01em;
+    margin-bottom: 4px;
+  }
+  .event-card-desc {
+    font-size: 10px;
+    color: #7a8e94;
+    line-height: 1.5;
+  }
+
+  /* Priority-specific card styles */
+  .event-card.priority-lowest {
+    --card-border-color: #efede9;
+    --card-header-color: #efede9;
+  }
+  .event-card.priority-low {
+    --card-border-color: #c8d7e8;
+    --card-header-color: #c8d7e8;
+  }
+  .event-card.priority-medium {
+    --card-border-color: #8ca3bf;
+    --card-header-color: #8ca3bf;
+  }
+  .event-card.priority-medium-high {
+    --card-border-color: #2e3e5c;
+    --card-header-color: #2e3e5c;
+  }
+  .event-card.priority-high {
+    --card-border-color: #1d2333;
+    --card-header-color: #1d2333;
+  }
+  .event-card.priority-critical {
+    --card-border-color: #f5a04b;
+    --card-header-color: #f5a04b;
+  }
+  .event-card.priority-emergency {
+    --card-border-color: #c6530c;
+    --card-header-color: #c6530c;
+  }
+  /* Missed events - orange stem */
+  .event-node.missed .event-dot {
+    background: var(--missed-color);
+    box-shadow: 0 0 0 2px var(--missed-color);
+  }
+  .event-node.missed .event-stem { background: var(--missed-color); }
+
+  /* LEGEND & FOOTER */
+  .footer-bar {
+    background: #f0f4f6;
+    border-top: 1px solid #c8d4d8;
+    padding: 9px 24px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .legend-title {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #2d4a52;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    width: 88px;
+    flex-shrink: 0;
+    padding-right: 12px;
+    border-right: 2px solid #c8d4d8;
+    margin-right: 14px;
+    line-height: 1.2;
+  }
+  .legend-items { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #3d5a62;
+    white-space: nowrap;
+  }
+  .legend-icon { width: 14px; height: 14px; flex-shrink: 0; }
+  .legend-divider { display: none; }
+
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #5a7078; }
+  .toggle {
+    width: 36px; height: 20px;
+    background: var(--sidebar-accent);
+    border-radius: 10px; position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    background: #fff; border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle.off { background: #c0ced2; }
+  .toggle.off::after { transform: translateX(0); }
+  .toggle:not(.off)::after { transform: translateX(16px); }
+
+  .btn-print {
+    background: var(--sidebar-accent);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 9px 20px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(77,184,200,0.3);
+  }
+  .btn-print:hover { background: #3aa6b8; box-shadow: 0 4px 12px rgba(77,184,200,0.4); }
+  .btn-print:active { transform: scale(0.97); box-shadow: none; }
+
+  .btn-primary {
+    background: #2e3e5c;
+    color: #fff;
+    border: 1.5px solid #2e3e5c;
+    border-radius: 7px;
+    padding: 9px 20px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.2s, transform 0.1s;
+    flex: 1;
+  }
+  .btn-primary:hover { background: #1d2d45; border-color: #1d2d45; }
+  .btn-primary:active { transform: scale(0.97); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--sidebar-accent);
+    border: 1.5px solid var(--sidebar-accent);
+    border-radius: 7px;
+    padding: 9px 20px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+  }
+  .btn-secondary:hover { background: var(--sidebar-accent); color: #fff; }
+  .btn-secondary:active { transform: scale(0.97); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20,35,40,0.55);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    width: 640px;
+    max-width: 96vw;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.28), 0 4px 16px rgba(0,0,0,0.12);
+    transform: scale(0.88);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34, 1.18, 0.64, 1), opacity 0.5s cubic-bezier(0.4,0,0.2,1);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-top: -220px;
+    margin-left: -320px;
+  }
+  .modal.dragging {
+    transition: none;
+    user-select: none;
+  }
+  .modal-overlay.open .modal {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .modal-header {
+    padding: 0 20px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    background: var(--modal-header-bg, #4db8c8);
+    cursor: grab;
+    user-select: none;
+  }
+  .modal-header:active { cursor: grabbing; }
+  .modal-close {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.15);
+    border: none; color: #fff;
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .modal-close:hover { background: rgba(0,0,0,0.3); }
+
+  .modal-body { padding: 24px 24px 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  .modal-field { display: flex; flex-direction: column; gap: 5px; }
+  .modal-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8a9ea4;
+  }
+  .modal-input {
+    width: 100%;
+    border: 1.5px solid #dde8ec;
+    border-radius: 7px;
+    padding: 9px 12px;
+    font-family: var(--font);
+    font-size: 13px;
+    color: #2d3a40;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fff;
+  }
+  .modal-input:focus {
+    border-color: var(--sidebar-accent);
+    box-shadow: 0 0 0 3px rgba(77,184,200,0.12);
+  }
+  .modal-textarea {
+    min-height: 72px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .modal-priority-row { display: flex; gap: 6px; flex-wrap: nowrap; width: 100%; }
+  .priority-chip {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    padding: 6px 4px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .priority-chip:hover { opacity: 0.85; }
+  .priority-chip.selected { opacity: 1; }
+  .priority-chip.chip-emergency   { background: #fff1ec; border-color: #c6530c; color: #8f3000; }
+  .priority-chip.chip-emergency.selected   { background: #c6530c; color: #ffffff; border-color: #c6530c; }
+  .priority-chip.chip-critical    { background: #fef8ec; border-color: #f5a04b; color: #a87000; }
+  .priority-chip.chip-critical.selected    { background: #f5a04b; color: #1d2333; border-color: #f5a04b; }
+  .priority-chip.chip-high        { background: #edf0f2; border-color: #1d2333; color: #1d2333; }
+  .priority-chip.chip-high.selected        { background: #1d2333; color: #ffffff; border-color: #1d2333; }
+  .priority-chip.chip-medium-high { background: #edf0f2; border-color: #2e3e5c; color: #2e3e5c; }
+  .priority-chip.chip-medium-high.selected { background: #2e3e5c; color: #ffffff; border-color: #2e3e5c; }
+  .priority-chip.chip-medium      { background: #edf8fb; border-color: #8ca3bf; color: #2d5878; }
+  .priority-chip.chip-medium.selected      { background: #8ca3bf; color: #1d2333; border-color: #8ca3bf; }
+  .priority-chip.chip-low         { background: #edf8fb; border-color: #c8d7e8; color: #2d5878; }
+  .priority-chip.chip-low.selected         { background: #c8d7e8; color: #1d2333; border-color: #c8d7e8; }
+  .priority-chip.chip-lowest      { background: #f8f7f5; border-color: #c8c4bc; color: #5a5650; }
+  .priority-chip.chip-lowest.selected      { background: #efede9; color: #1d2333; border-color: #c8c4bc; }
+
+  .modal-footer {
+    padding: 14px 24px;
+    background: #f8fafb;
+    border-top: 1px solid #e4edf0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-delete {
+    background: none;
+    border: 1.5px solid #c6530c;
+    color: #c6530c;
+    border-radius: 7px;
+    padding: 8px 18px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+    letter-spacing: 0.04em;
+  }
+  .btn-delete:hover { background: #c6530c; color: #fff; }
+  .btn-delete:active { transform: scale(0.97); }
+
+  .btn-cancel {
+    background: none;
+    border: 1.5px solid #ccd8dc;
+    color: #5a7078;
+    border-radius: 7px;
+    padding: 8px 18px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, transform 0.1s;
+    letter-spacing: 0.04em;
+  }
+  .btn-cancel:hover { border-color: #8aa8b0; color: #2d4a52; }
+  .btn-cancel:active { transform: scale(0.97); }
+
+  .btn-save {
+    background: var(--sidebar-accent);
+    border: none; color: #fff;
+    border-radius: 7px;
+    padding: 8px 22px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    letter-spacing: 0.04em;
+    box-shadow: 0 2px 8px rgba(77,184,200,0.3);
+  }
+  .btn-save:hover { background: #3aa6b8; box-shadow: 0 4px 12px rgba(77,184,200,0.4); }
+  .btn-save:active { transform: scale(0.97); box-shadow: none; }
+
+  /* ── THEME PICKER ─────────────────────────────────────────────────── */
+  .theme-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 7px 10px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    user-select: none;
+  }
+  .theme-trigger:hover { border-color: var(--sidebar-accent); }
+  .theme-trigger-swatches {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .theme-trigger-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .theme-trigger-name {
+    font-size: 11px;
+    color: var(--sidebar-text);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .theme-trigger-arrow {
+    font-size: 10px;
+    color: var(--sidebar-accent);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .theme-trigger-arrow.open { transform: rotate(180deg); }
+
+  .theme-panel {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 4px);
+    width: 340px;
+    background: #1e2e34;
+    border: 1px solid rgba(77,184,200,0.25);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+    padding: 8px;
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .theme-panel.open { display: flex; }
+
+  .theme-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .theme-row:hover { background: rgba(255,255,255,0.07); }
+  .theme-row.active { background: rgba(77,184,200,0.12); }
+
+  .theme-row-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sidebar-text);
+    width: 90px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .theme-row-swatches {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+  }
+  .theme-row-swatch {
+    flex: 1;
+    height: 18px;
+    border-radius: 3px;
+  }
+  .theme-row-check {
+    font-size: 11px;
+    color: var(--sidebar-accent);
+    width: 12px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  /* ── POAM SWITCHER ────────────────────────────────────────────────── */
+  .poam-switcher {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    user-select: none;
+  }
+  .poam-switcher:hover {
+    border-color: var(--sidebar-accent);
+    background: rgba(255,255,255,0.12);
+  }
+  .poam-switcher.open {
+    border-color: var(--sidebar-accent);
+    background: rgba(77,184,200,0.1);
+  }
+  .poam-switcher-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .poam-switcher-icon {
+    color: var(--sidebar-accent);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+  .poam-switcher-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .poam-switcher-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sidebar-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.01em;
+  }
+  .poam-switcher-meta {
+    font-size: 10px;
+    color: var(--sidebar-accent);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    opacity: 0.85;
+  }
+  .poam-switcher-chevron {
+    font-size: 11px;
+    color: var(--sidebar-accent);
+    flex-shrink: 0;
+    transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  .poam-switcher.open .poam-switcher-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* Popover */
+  .poam-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: #1e2e34;
+    border: 1px solid rgba(77,184,200,0.25);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    z-index: 300;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .poam-popover.open {
+    display: flex;
+  }
+  .poam-popover-list {
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    gap: 2px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .poam-popover-list::-webkit-scrollbar { width: 4px; }
+  .poam-popover-list::-webkit-scrollbar-track { background: transparent; }
+  .poam-popover-list::-webkit-scrollbar-thumb { background: rgba(77,184,200,0.3); border-radius: 2px; }
+
+  .poam-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .poam-popover-item:hover { background: rgba(255,255,255,0.07); }
+  .poam-popover-item.active { background: rgba(77,184,200,0.12); }
+  .poam-popover-item-name {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sidebar-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .poam-popover-item-meta {
+    font-size: 10px;
+    color: rgba(77,184,200,0.7);
+    flex-shrink: 0;
+  }
+  .poam-popover-item-check {
+    font-size: 11px;
+    color: var(--sidebar-accent);
+    width: 14px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .poam-popover-divider {
+    height: 1px;
+    background: rgba(77,184,200,0.15);
+    margin: 0 6px;
+    flex-shrink: 0;
+  }
+  .poam-popover-create {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sidebar-accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .poam-popover-create:hover { background: rgba(77,184,200,0.08); }
+
+  .poam-delete-btn {
+    background: none;
+    border: none;
+    color: rgba(232,240,242,0.35);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-left: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .poam-delete-btn:hover { color: #f5a04b; background: rgba(198,83,12,0.15); }
+
+
+  .timeline-wrapper::-webkit-scrollbar-track { background: #dde5e8; }
+  .timeline-wrapper::-webkit-scrollbar-thumb { background: #a8c0c8; border-radius: 3px; }
+
+  /* ── DATE MODE TOGGLE ─────────────────────────────────────────────── */
+  .date-mode-toggle {
+    display: flex;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .modal-body .date-mode-toggle {
+    background: #f0f4f5;
+    border: 1px solid #d8e4e8;
+  }
+  .date-mode-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: rgba(232,240,242,0.55);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-transform: uppercase;
+  }
+  .modal-body .date-mode-btn { color: #8a9ea4; }
+  .date-mode-btn.active { background: var(--sidebar-accent); color: #fff; }
+  .date-mode-btn:not(.active):hover {
+    background: rgba(255,255,255,0.08);
+    color: rgba(232,240,242,0.85);
+  }
+  .modal-body .date-mode-btn:not(.active):hover {
+    background: rgba(77,184,200,0.1);
+    color: #2d4a52;
+  }
+
+  /* ── RANGE EVENT BAR ──────────────────────────────────────────────── */
+  .range-bar-lane {
+    position: absolute;
+    height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: filter 0.15s, box-shadow 0.15s;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+  .range-bar-lane:hover {
+    filter: brightness(0.97);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+  }
+  .range-bar-label {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 8px;
+    pointer-events: none;
+    width: 100%;
+    text-align: center;
+    color: #2d3a40;
+  }
+  .range-stem {
+    position: absolute;
+    width: 1.5px;
+    background: #b0c8cf;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .range-card-wrap {
+    position: absolute;
+    pointer-events: all;
+    z-index: 10;
+  }
+  #sidebar-date-range { display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── TYPE EDITOR ──────────────────────────────────────────────────── */
+  .type-editor-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    background: #f5f8fa;
+    border: 1px solid #dde8ec;
+    border-radius: 7px;
+  }
+  .shape-picker {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .shape-pick {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1.5px solid #d0dde0;
+    cursor: pointer;
+    color: #5a7a84;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .shape-pick:hover { border-color: #4db8c8; color: #2d4a52; background: #edf8fb; }
+  .shape-pick.selected { border-color: #4db8c8; background: #e0f4f8; color: #2d4a52; }
+
+  /* ── EMPTY STATE ──────────────────────────────────────────────────── */
+  #empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  #empty-state.hidden { display: none; }
+  #empty-state-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #2d4a52;
+    letter-spacing: 0.03em;
+    opacity: 0.55;
+  }
+  #empty-state-sub {
+    font-size: 12.5px;
+    color: #5a7a84;
+    opacity: 0.55;
+    max-width: 340px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .sidebar-wrapper {
+    display: flex;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .sidebar {
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1),
+                min-width 0.3s cubic-bezier(0.4,0,0.2,1),
+                padding 0.3s cubic-bezier(0.4,0,0.2,1),
+                opacity 0.2s ease;
+    overflow-x: hidden;
+  }
+  .sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding-left: 0;
+    padding-right: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .sidebar-toggle-strip {
+    width: 14px;
+    background: var(--sidebar-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-left: 1px solid rgba(255,255,255,0.07);
+    transition: filter 0.15s;
+  }
+  .sidebar-toggle-strip:hover { filter: brightness(1.25); }
+  .sidebar-toggle-arrow {
+    font-size: 9px;
+    color: var(--sidebar-accent);
+    user-select: none;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    line-height: 1;
+  }
+  .sidebar-wrapper.is-collapsed .sidebar-toggle-arrow { transform: rotate(180deg); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR WRAPPER -->
+<div class="sidebar-wrapper" id="sidebar-wrapper">
+<aside class="sidebar" id="sidebar">
+  <!-- POAM SWITCHER -->
+  <div style="position:relative;">
+    <div class="sidebar-section-label">Active POAM</div>
+    <div class="poam-switcher" id="poam-switcher" onclick="togglePoamSwitcher()">
+      <div class="poam-switcher-inner">
+        <div class="poam-switcher-icon">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="1.5" rx="0.75" fill="currentColor"/>
+            <rect x="1" y="6.25" width="12" height="1.5" rx="0.75" fill="currentColor"/>
+            <rect x="1" y="10.5" width="8" height="1.5" rx="0.75" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="poam-switcher-text">
+          <div class="poam-switcher-name" id="poam-switcher-name" style="opacity:0.55;font-style:italic;">Select a POAM…</div>
+          <div class="poam-switcher-meta" id="poam-switcher-meta"></div>
+        </div>
+        <div class="poam-switcher-chevron" id="poam-switcher-chevron">▾</div>
+      </div>
+    </div>
+
+    <!-- Switcher Popover -->
+    <div class="poam-popover" id="poam-popover">
+      <div class="poam-popover-list" id="poam-popover-list"></div>
+      <div class="poam-popover-divider"></div>
+      <div class="poam-popover-create" onclick="closePoamSwitcher(); openCreateModal();">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0">
+          <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Create New POAM
+      </div>
+    </div>
+  </div>
+  <!-- Edit Phases trigger — only shown when a POAM is active -->
+  <div id="edit-phases-trigger" style="display:none; margin-top:-10px;">
+    <div style="display:flex; gap:6px;">
+      <button onclick="openEditPhasesModal()" style="flex:1; background:none; border:1px solid rgba(77,184,200,0.3); border-radius:6px; color:rgba(77,184,200,0.85); font-family:var(--font); font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:6px 8px; cursor:pointer; transition:border-color 0.2s, background 0.2s; display:flex; align-items:center; gap:5px;">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="flex-shrink:0"><path d="M8.5 1.5l2 2-7 7H1.5v-2l7-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Phases
+      </button>
+      <button onclick="openEditTypesModal()" style="flex:1; background:none; border:1px solid rgba(77,184,200,0.3); border-radius:6px; color:rgba(77,184,200,0.85); font-family:var(--font); font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:6px 8px; cursor:pointer; transition:border-color 0.2s, background 0.2s; display:flex; align-items:center; gap:5px;">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="flex-shrink:0"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M6 3.5v2.5l1.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Types
+      </button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="sidebar-section-label">Add Event</div>
+    <div class="sidebar-field-label">Event Name <span style="color:rgba(245,160,75,0.9)">*</span></div>
+    <input type="text" id="new-name" placeholder="Enter event name…" maxlength="40">
+    <div class="char-limit">Max 40 characters</div>
+    <div class="sidebar-field-label" style="margin-top:8px;">Description</div>
+    <textarea id="new-desc" placeholder="Enter event details…" rows="4"></textarea>
+
+    <!-- Date mode toggle -->
+    <div class="date-mode-toggle sidebar-date-mode" id="sidebar-date-mode-toggle">
+      <button class="date-mode-btn active" data-mode="single" onclick="setSidebarDateMode('single')">Single</button>
+      <button class="date-mode-btn" data-mode="range" onclick="setSidebarDateMode('range')">Range</button>
+    </div>
+    <div id="sidebar-date-single">
+      <input type="date" id="new-date">
+    </div>
+    <div id="sidebar-date-range" style="display:none; flex-direction:column; gap:6px;">
+      <input type="date" id="new-date-start" placeholder="Start date">
+      <input type="date" id="new-date-end" placeholder="End date">
+    </div>
+
+    <select id="new-priority">
+      <option value="">Select Priority</option>
+      <option value="emergency">Emergency</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium-high">Medium-High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="lowest">Lowest</option>
+    </select>
+    <select id="new-type">
+      <option value="">Select Event Type</option>
+    </select>
+    <button class="btn-add" onclick="addEvent()">+ ADD EVENT</button>
+  </div>
+
+  <!-- COLOR THEME PICKER -->
+  <div style="position:relative;">
+    <div class="sidebar-section-label">Color Theme</div>
+    <div class="theme-trigger" id="theme-trigger" onclick="toggleThemePanel()">
+      <div class="theme-trigger-swatches" id="theme-trigger-swatches"></div>
+      <span class="theme-trigger-name" id="theme-trigger-name">Slate &amp; Ember</span>
+      <span class="theme-trigger-arrow" id="theme-trigger-arrow">▾</span>
+    </div>
+    <div class="theme-panel" id="theme-panel"></div>
+  </div>
+
+  <div>
+    <div class="sidebar-section-label">Filter by Type</div>
+    <div class="filter-list" id="filter-list">
+      <!-- populated dynamically by rebuildTypeUI() -->
+    </div>
+
+    <!-- ZOOM -->
+    <div style="height:1px; background:rgba(255,255,255,0.1); margin: 16px 0 14px;"></div>
+    <div class="sidebar-section-label">Timeline Zoom</div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="adjustZoom(-0.25)">−</button>
+      <span class="zoom-label" id="zoom-label">100%</span>
+      <button class="zoom-btn" onclick="adjustZoom(0.25)">+</button>
+    </div>
+
+    <!-- PRINT -->
+    <button class="btn-print" id="btn-export" onclick="exportTimelinePNG()" style="width:100%; margin-top:10px;" title="Exports a 1920×1080 PNG — saved to your Downloads folder">EXPORT POAM</button>
+  </div>
+</aside>
+  <div class="sidebar-toggle-strip" onclick="toggleSidebar()" title="Toggle sidebar">
+    <span class="sidebar-toggle-arrow" id="sidebar-toggle-arrow">◀</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="timeline-wrapper" id="timeline-wrapper">
+    <div class="timeline-canvas" id="timeline-canvas">
+      <!-- Phase headers — populated by JS to match band widths -->
+      <div class="phase-regions" id="phase-regions"></div>
+
+      <!-- Timeline area -->
+      <div class="timeline-area" id="timeline-area">
+        <!-- Phase background bands (populated by JS) -->
+        <div id="phase-bands"></div>
+
+        <!-- month labels (populated by JS) -->
+        <div id="month-markers" class="month-markers"></div>
+
+        <!-- Date ticks (populated by JS) -->
+        <div id="date-ticks"></div>
+
+        <!-- timeline line -->
+        <div class="timeline-line"></div>
+
+        <!-- current date marker -->
+        <div class="current-date-marker" style="left:20%">
+          <div class="current-date-label">Current Date</div>
+        </div>
+
+        <!-- Events rendered by JS -->
+        <div id="events-container"></div>
+
+        <!-- Empty state — shown when no POAM is active -->
+        <div id="empty-state">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="opacity:0.35;">
+            <rect x="4" y="8" width="40" height="32" rx="4" stroke="#4db8c8" stroke-width="2.5" fill="none"/>
+            <line x1="4" y1="18" x2="44" y2="18" stroke="#4db8c8" stroke-width="2" stroke-dasharray="4 3"/>
+            <circle cx="24" cy="30" r="6" stroke="#4db8c8" stroke-width="2" fill="none"/>
+            <line x1="24" y1="27" x2="24" y2="30" stroke="#4db8c8" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="24" cy="33" r="1.2" fill="#4db8c8"/>
+          </svg>
+          <div id="empty-state-title">No POAM Selected</div>
+          <div id="empty-state-sub">Select an existing POAM or create a new one using the panel on the left.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <!-- Row 1: Priority -->
+    <div class="legend-row">
+      <span class="legend-title">Priority</span>
+      <div class="legend-items">
+        <div class="legend-item" data-priority="emergency"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#c6530c"/></svg>Emergency</div>
+        <div class="legend-item" data-priority="critical"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#f5a04b"/></svg>Critical</div>
+        <div class="legend-item" data-priority="high"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#1d2333"/></svg>High</div>
+        <div class="legend-item" data-priority="medium-high"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#2e3e5c"/></svg>Medium-High</div>
+        <div class="legend-item" data-priority="medium"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#8ca3bf"/></svg>Medium</div>
+        <div class="legend-item" data-priority="low"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#c8d7e8"/></svg>Low</div>
+        <div class="legend-item" data-priority="lowest"><svg class="legend-icon" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#efede9" stroke="#b8b4ac" stroke-width="1.5"/></svg>Lowest</div>
+      </div>
+    </div>
+    <!-- Row 2: Event Type -->
+    <div class="legend-row">
+      <span class="legend-title">Event Type</span>
+      <div class="legend-items" id="legend-type-items">
+        <!-- populated dynamically by rebuildTypeUI() -->
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- CREATE POAM MODAL -->
+<div class="modal-overlay" id="create-modal-overlay" onclick="handleCreateOverlayClick(event)">
+  <div class="modal" id="create-modal" style="width:700px; margin-left:-350px; margin-top:-220px;">
+    <div class="modal-header" id="create-modal-header" style="background:#2e3e5c; cursor:default;">
+      <span>POAM Create Panel</span>
+      <button class="modal-close" onclick="closeCreateModal()">✕</button>
+    </div>
+    <div style="display:flex; min-height:320px;">
+      <!-- Left column: form -->
+      <div style="flex:1; padding:24px 28px; display:flex; flex-direction:column; gap:16px; border-right:1.5px solid rgba(77,184,200,0.25); overflow-y:auto; max-height:520px;">
+        <div class="modal-field">
+          <label class="modal-label">POAM Name</label>
+          <input type="text" class="modal-input" id="create-poam-name" placeholder="Type POAM Name here" maxlength="60">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Number of Phases</label>
+          <select class="modal-input" id="create-poam-phases" style="appearance:auto; cursor:pointer;" onchange="buildPhaseFields()">
+            <option value="">Select Number</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+
+        <!-- Dynamic phase date fields injected here -->
+        <div id="phase-date-fields" style="display:flex; flex-direction:column; gap:12px;"></div>
+
+        <!-- ── Event Types step (shown after phases are defined) ── -->
+        <div id="create-types-section" style="display:none; flex-direction:column; gap:10px;">
+          <div style="height:1px; background:rgba(77,184,200,0.15);"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div class="modal-label" style="color:#4db8c8; letter-spacing:0.1em; margin:0;">EVENT TYPES <span style="opacity:0.5; font-size:9px; letter-spacing:0.05em;">(MAX 7)</span></div>
+            <button id="ct-add-btn" onclick="addCreateTypeRow()" style="background:none; border:1px solid rgba(77,184,200,0.4); border-radius:5px; color:#4db8c8; font-family:var(--font); font-size:10px; font-weight:600; padding:4px 10px; cursor:pointer; letter-spacing:0.06em;">+ ADD TYPE</button>
+          </div>
+          <div id="create-type-rows" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:4px;">
+          <button class="btn-secondary" onclick="closeCreateModal()">Cancel</button>
+          <button class="btn-primary" onclick="confirmCreatePoam()">Create new POAM</button>
+        </div>
+      </div>
+      <!-- Right column: instructions -->
+      <div style="width:220px; padding:28px 20px; display:flex; align-items:flex-start; padding-top:32px;">
+        <p style="font-size:13px; color:#8ca3bf; line-height:1.7; margin:0;">
+          Enter a POAM name and select the number of phases. Set a start and end date for each phase — these define the timeline bands displayed in the main view.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE POAM CONFIRMATION MODAL -->
+<div class="modal-overlay" id="delete-poam-overlay" onclick="handleDeletePoamOverlayClick(event)">
+  <div class="modal" style="width:420px; margin-left:-210px; margin-top:-100px;">
+    <div class="modal-header" style="background:#8a2a0a; cursor:default;">
+      <span>Delete POAM</span>
+      <button class="modal-close" onclick="closeDeletePoamModal()">✕</button>
+    </div>
+    <div style="padding:24px 28px; display:flex; flex-direction:column; gap:16px;">
+      <p style="font-size:13px; color:#2d3a40; line-height:1.6; margin:0;">
+        Are you sure you want to delete <strong id="delete-poam-label" style="color:#8a2a0a;"></strong>?
+        <br><span style="font-size:12px; color:#7a8e94;">This action cannot be undone. All events within this POAM will be permanently removed.</span>
+      </p>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn-secondary" onclick="closeDeletePoamModal()">Cancel</button>
+        <button onclick="confirmDeletePoam()" style="background:#c6530c; border:none; color:#fff; border-radius:7px; padding:8px 20px; font-family:var(--font); font-size:12px; font-weight:600; cursor:pointer; letter-spacing:0.04em; transition:background 0.2s;">Delete POAM</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT TYPES MODAL -->
+<div class="modal-overlay" id="edit-types-overlay" onclick="handleEditTypesOverlayClick(event)">
+  <div class="modal" id="edit-types-modal" style="width:580px; margin-left:-290px; margin-top:-210px;">
+    <div class="modal-header" style="background:#2d4a52; cursor:default;">
+      <span>Edit Event Types</span>
+      <button class="modal-close" onclick="closeEditTypesModal()">✕</button>
+    </div>
+    <div style="padding:20px 24px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:480px;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <p style="font-size:12px; color:#8ca3bf; margin:0;">Up to 7 types per POAM. Each type gets a unique shape icon.</p>
+        <button id="et-add-btn" onclick="addEditTypeRow()" style="background:none; border:1px solid rgba(77,184,200,0.4); border-radius:5px; color:#4db8c8; font-family:var(--font); font-size:10px; font-weight:600; padding:4px 10px; cursor:pointer; letter-spacing:0.06em; white-space:nowrap;">+ ADD TYPE</button>
+      </div>
+      <div id="edit-type-rows" style="display:flex; flex-direction:column; gap:8px;"></div>
+      <div style="display:flex; gap:10px; margin-top:4px;">
+        <button class="btn-secondary" onclick="closeEditTypesModal()">Cancel</button>
+        <button class="btn-primary" onclick="confirmEditTypes()">Save Types</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PHASES MODAL -->
+<div class="modal-overlay" id="edit-phases-overlay" onclick="handleEditPhasesOverlayClick(event)">
+  <div class="modal" id="edit-phases-modal" style="width:640px; margin-left:-320px; margin-top:-200px;">
+    <div class="modal-header" style="background:#2d4a52; cursor:default;">
+      <span>Edit Phases</span>
+      <button class="modal-close" onclick="closeEditPhasesModal()">✕</button>
+    </div>
+    <div style="padding:24px 28px; display:flex; flex-direction:column; gap:16px; overflow-y:auto; max-height:500px;">
+      <div id="edit-phase-fields" style="display:flex; flex-direction:column; gap:14px;"></div>
+      <div style="display:flex; gap:10px; margin-top:4px;">
+        <button class="btn-secondary" onclick="closeEditPhasesModal()">Cancel</button>
+        <button class="btn-primary" onclick="confirmEditPhases()">Save Phases</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header" id="modal-header">
+      <span id="modal-title">Edit Event</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-label">Event Name</label>
+        <input type="text" class="modal-input" id="modal-name" maxlength="40" placeholder="Enter event name">
+      </div>
+      <div class="modal-row">
+        <div class="modal-field" style="grid-column:1/-1;">
+          <label class="modal-label">Date Mode</label>
+          <div class="date-mode-toggle" id="modal-date-mode-toggle">
+            <button class="date-mode-btn active" data-mode="single" onclick="setModalDateMode('single')">Single Date</button>
+            <button class="date-mode-btn" data-mode="range" onclick="setModalDateMode('range')">Date Range</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-row" id="modal-date-single-row">
+        <div class="modal-field">
+          <label class="modal-label">Date</label>
+          <input type="date" class="modal-input" id="modal-date">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Event Type</label>
+          <select class="modal-input" id="modal-type">
+            <option value="">Select Type</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-row" id="modal-date-range-row" style="display:none; grid-template-columns:1fr 1fr 1fr;">
+        <div class="modal-field">
+          <label class="modal-label">Start Date</label>
+          <input type="date" class="modal-input" id="modal-date-start">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">End Date</label>
+          <input type="date" class="modal-input" id="modal-date-end">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Event Type</label>
+          <select class="modal-input" id="modal-type-range">
+            <option value="">Select Type</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Description</label>
+        <textarea class="modal-input modal-textarea" id="modal-desc" placeholder="Short event description…" maxlength="120"></textarea>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Priority Level</label>
+        <div class="modal-priority-row" id="modal-priority-row">
+          <div class="priority-chip chip-emergency"   data-priority="emergency"   onclick="selectPriority('emergency')">Emergency</div>
+          <div class="priority-chip chip-critical"    data-priority="critical"    onclick="selectPriority('critical')">Critical</div>
+          <div class="priority-chip chip-high"        data-priority="high"        onclick="selectPriority('high')">High</div>
+          <div class="priority-chip chip-medium-high" data-priority="medium-high" onclick="selectPriority('medium-high')">Medium-High</div>
+          <div class="priority-chip chip-medium"      data-priority="medium"      onclick="selectPriority('medium')">Medium</div>
+          <div class="priority-chip chip-low"         data-priority="low"         onclick="selectPriority('low')">Low</div>
+          <div class="priority-chip chip-lowest"      data-priority="lowest"      onclick="selectPriority('lowest')">Lowest</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-delete" onclick="deleteEvent()">Delete Event</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-save" onclick="saveModal()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── POAM REGISTRY ─────────────────────────────────────────────────────────────
+// Each entry stores the POAM's name, phase definitions, and events snapshot.
+let poamRegistry = [
+  {
+    id: 'military-poam',
+    name: 'Military_POAM',
+    phases: [
+      { label: 'PHASE 1', start: '2026-02-15', end: '2026-03-15' },
+      { label: 'PHASE 2', start: '2026-03-15', end: '2026-05-15' },
+    ],
+    types: [
+      { name: 'Commander Event', shape: 'pentagon'       },
+      { name: 'DCOM Event',      shape: 'star'           },
+      { name: 'COS Event',       shape: 'cos-star'       },
+      { name: 'Executive Event', shape: 'diamond'        },
+      { name: '0-6 Event',       shape: 'circle'         },
+      { name: 'Standard Event',  shape: 'rounded-rect'   },
+      { name: 'Other',           shape: 'circle-outline' },
+    ],
+    events: [
+      { id: 1,  name: 'Event Number One',   date: '2026-03-14', desc: 'Short event description with a character limit', priority: 'medium',       type: 'DCOM Event'       },
+      { id: 2,  name: 'Event Number Four',  date: '2026-03-18', desc: 'Short event description with a character limit', priority: 'high',         type: 'Commander Event'  },
+      { id: 3,  name: 'Event Number Six',   date: '2026-03-25', desc: 'Short event description with a character limit', priority: 'medium-high',  type: 'COS Event'        },
+      { id: 4,  name: 'Event Number Eight', date: '2026-04-02', desc: 'Short event description with a character limit', priority: 'critical',     type: 'Standard Event'   },
+      { id: 5,  name: 'Event Number Nine',  date: '2026-04-10', desc: 'Short event description with a character limit', priority: 'medium',       type: 'Executive Event'  },
+      { id: 6,  name: 'Event Number Ten',   date: '2026-04-18', desc: 'Short event description with a character limit', priority: 'critical',     type: 'Commander Event'  },
+      { id: 7,  name: 'Event Number Two',   date: '2026-04-28', desc: 'Short event description with a character limit', priority: 'low',          type: '0-6 Event'        },
+      { id: 8,  name: 'Event Number Five',  date: '2026-03-12', desc: 'Short event description with a character limit', priority: 'lowest',       type: 'Standard Event'   },
+      { id: 9,  name: 'Event Number Three', date: '2026-04-22', desc: 'Short event description with a character limit', priority: 'emergency',    type: 'Other'            },
+      { id: 10, name: 'Event Number Seven', date: '2026-05-01', desc: 'Short event description with a character limit', priority: 'high',         type: 'Executive Event'  },
+      { id: 11, name: 'Event Number Ten B', date: '2026-05-08', desc: 'Short event description with a character limit', priority: 'emergency',    type: 'Commander Event'  },
+    ],
+  },
+  {
+    id: 'ops-poam-2026',
+    name: 'Ops_POAM_2026',
+    phases: [
+      { label: 'PHASE 1', start: '2026-03-01', end: '2026-06-01' },
+      { label: 'PHASE 2', start: '2026-06-01', end: '2026-09-01' },
+      { label: 'PHASE 3', start: '2026-09-01', end: '2026-12-01' },
+    ],
+    types: [
+      { name: 'Commander Event', shape: 'pentagon'       },
+      { name: 'DCOM Event',      shape: 'star'           },
+      { name: 'COS Event',       shape: 'cos-star'       },
+      { name: 'Executive Event', shape: 'diamond'        },
+      { name: '0-6 Event',       shape: 'circle'         },
+      { name: 'Standard Event',  shape: 'rounded-rect'   },
+      { name: 'Other',           shape: 'circle-outline' },
+    ],
+    events: [],
+  },
+];
+
+let activePoamId = null;
+
+function getActivePoam() {
+  return poamRegistry.find(p => p.id === activePoamId);
+}
+
+function buildPoamPopover() {
+  const list = document.getElementById('poam-popover-list');
+  if (!list) return;
+  list.innerHTML = '';
+  poamRegistry.forEach(poam => {
+    const item = document.createElement('div');
+    item.className = 'poam-popover-item' + (poam.id === activePoamId ? ' active' : '');
+    item.style.cssText = 'display:flex; align-items:center;';
+    const phaseCount = poam.phases.length;
+    item.innerHTML = `
+      <div class="poam-popover-item-check" style="flex-shrink:0;">${poam.id === activePoamId ? '✓' : ''}</div>
+      <div class="poam-popover-item-name" style="flex:1;">${poam.name}</div>
+      <div class="poam-popover-item-meta" style="flex-shrink:0;">${phaseCount} Phase${phaseCount !== 1 ? 's' : ''}</div>
+      <button class="poam-delete-btn" title="Delete POAM" onclick="event.stopPropagation(); openDeletePoamModal('${poam.id}', '${poam.name.replace(/'/g, "\\'")}')">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M4.5 3v6M7.5 3v6M3 3l.5 7h5L9 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    `;
+    item.addEventListener('click', () => switchPoam(poam.id));
+    list.appendChild(item);
+  });
+}
+
+function switchPoam(id) {
+  // Save current state back to registry
+  const current = getActivePoam();
+  if (current) {
+    current.events = events.map(e => ({ ...e }));
+    current.phases = phases.map(p => ({ ...p }));
+  }
+
+  // Load new POAM
+  const target = poamRegistry.find(p => p.id === id);
+  if (!target) return;
+  activePoamId = id;
+
+  events = target.events.map(e => ({ ...e }));
+  nextId = events.length ? Math.max(...events.map(e => e.id)) + 1 : 1;
+  phases.length = 0;
+  target.phases.forEach(p => phases.push({ ...p }));
+
+  // Update switcher UI
+  document.getElementById('poam-switcher-name').textContent = target.name;
+  document.getElementById('poam-switcher-name').style.opacity = '';
+  document.getElementById('poam-switcher-name').style.fontStyle = '';
+  document.getElementById('poam-switcher-meta').textContent = target.phases.length + ' Phase' + (target.phases.length !== 1 ? 's' : '');
+
+  // Hide empty state, restore timeline chrome
+  document.getElementById('empty-state').classList.add('hidden');
+  document.querySelector('.timeline-line').style.display = '';
+  document.querySelector('.current-date-marker').style.display = '';
+  document.getElementById('edit-phases-trigger').style.display = 'block';
+
+  // Rebuild type-dependent UI for the newly active POAM
+  rebuildTypeUI();
+
+  // Re-render
+  recalcTimeRange();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+
+  closePoamSwitcher();
+}
+
+function togglePoamSwitcher() {
+  const switcher = document.getElementById('poam-switcher');
+  const popover  = document.getElementById('poam-popover');
+  const isOpen   = popover.classList.contains('open');
+  if (!isOpen) buildPoamPopover();
+  switcher.classList.toggle('open', !isOpen);
+  popover.classList.toggle('open', !isOpen);
+}
+
+function closePoamSwitcher() {
+  document.getElementById('poam-switcher').classList.remove('open');
+  document.getElementById('poam-popover').classList.remove('open');
+}
+
+// Close popover on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#poam-switcher') && !e.target.closest('#poam-popover')) {
+    closePoamSwitcher();
+  }
+});
+
+
+// Each theme maps its 7 colors to the 7 priority levels in this order:
+// [emergency, critical, high, medium-high, medium, low, lowest]
+// Text color is auto-determined by luminance contrast.
+
+const COLOR_THEMES = [
+  {
+    id: 'slate-ember',
+    name: 'Slate & Ember',
+    colors: ['#c6530c','#f5a04b','#1d2333','#2e3e5c','#8ca3bf','#c8d7e8','#efede9'],
+  },
+  {
+    id: 'verdant',
+    name: 'Verdant',
+    colors: ['#192f22','#2c4a37','#3d794e','#5a7f62','#c8a84b','#e8e0cc','#f4f0e4'],
+  },
+  {
+    id: 'oxidized',
+    name: 'Oxidized',
+    colors: ['#1f1a17','#352b26','#a63d2f','#84736a','#c87941','#e4d8cc','#f5ede4'],
+  },
+  {
+    id: 'neon-archaeology',
+    name: 'Neon Archaeology',
+    colors: ['#17122a','#2e1f5f','#dc2625','#f7c948','#2ed4bf','#49de80','#ede8d0'],
+  },
+  {
+    id: 'coral-reactor',
+    name: 'Coral Reactor',
+    colors: ['#17122a','#2d3440','#ff6b6b','#fb923c','#a2e634','#7dd3fc','#ede8d0'],
+  },
+  {
+    id: 'us-air-force',
+    name: 'US Air Force',
+    colors: ['#071d40','#023087','#1d4f9c','#a8b2be','#f0b323','#d6e4f0','#f2f4f7'],
+  },
+];
+
+const PRIORITY_KEYS = ['emergency','critical','high','medium-high','medium','low','lowest'];
+
+// Returns white or dark text based on luminance
+function contrastText(hex) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  const toL = c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  const lum = 0.2126*toL(r) + 0.7152*toL(g) + 0.0722*toL(b);
+  const contrastWith = l2 => (Math.max(lum,l2)+0.05)/(Math.min(lum,l2)+0.05);
+  return contrastWith(1.0) >= contrastWith(0.017) ? '#ffffff' : '#1d2333';
+}
+
+let activeThemeId = 'slate-ember';
+
+// Fixed two-color icon palette — consistent across all themes.
+const ICON_DARK  = '#071d40'; // near-black navy — used on light headers and legend
+const ICON_LIGHT = '#f2f4f7'; // near-white — used on dark headers
+
+// Returns the correct icon color for a card header based on its text color.
+function getIconColor(headerText) {
+  return headerText === '#ffffff' ? ICON_LIGHT : ICON_DARK;
+}
+
+// priorityConfig is declared here and mutated by applyColorTheme
+const priorityConfig = {};
+
+function applyColorTheme(themeId) {
+  const theme = COLOR_THEMES.find(t => t.id === themeId);
+  if (!theme) return;
+  activeThemeId = themeId;
+
+  // Rebuild priorityConfig from theme colors
+  PRIORITY_KEYS.forEach((key, i) => {
+    const hex = theme.colors[i];
+    const txt = contrastText(hex);
+    priorityConfig[key] = { header: hex, border: hex, headerText: txt };
+  });
+
+  // Update trigger display
+  const triggerSwatches = document.getElementById('theme-trigger-swatches');
+  const triggerName = document.getElementById('theme-trigger-name');
+  if (triggerSwatches) {
+    triggerSwatches.innerHTML = '';
+    // Show first 4 swatches in the trigger
+    theme.colors.slice(0, 4).forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'theme-trigger-dot';
+      d.style.background = c;
+      triggerSwatches.appendChild(d);
+    });
+  }
+  if (triggerName) triggerName.textContent = theme.name;
+
+  // Update active state in panel
+  document.querySelectorAll('.theme-row').forEach(row => {
+    row.classList.toggle('active', row.dataset.themeId === themeId);
+    const check = row.querySelector('.theme-row-check');
+    if (check) check.textContent = row.dataset.themeId === themeId ? '✓' : '';
+  });
+
+  // Update the footer legend priority swatches
+  updateLegend();
+
+  // Re-render events with new colors
+  renderEvents && renderEvents();
+}
+
+function updateLegend() {
+  // Priority swatches — fill from theme config
+  document.querySelectorAll('.legend-item[data-priority]').forEach(item => {
+    const key = item.dataset.priority;
+    const cfg = priorityConfig[key];
+    if (!cfg) return;
+    const shape = item.querySelector('rect, circle, polygon');
+    if (shape) {
+      shape.setAttribute('fill', cfg.header);
+      if (key === 'lowest') {
+        shape.setAttribute('stroke', cfg.header === '#efede9' ? '#b8b4ac' : 'rgba(0,0,0,0.25)');
+      }
+    }
+  });
+
+  // Event type icons are handled by rebuildTypeUI(), not theme-dependent
+}
+
+function buildThemePanel() {
+  const panel = document.getElementById('theme-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  COLOR_THEMES.forEach(theme => {
+    const row = document.createElement('div');
+    row.className = 'theme-row' + (theme.id === activeThemeId ? ' active' : '');
+    row.dataset.themeId = theme.id;
+    row.innerHTML = `
+      <span class="theme-row-name">${theme.name}</span>
+      <div class="theme-row-swatches">
+        ${theme.colors.map(c => `<div class="theme-row-swatch" style="background:${c}"></div>`).join('')}
+      </div>
+      <span class="theme-row-check">${theme.id === activeThemeId ? '✓' : ''}</span>
+    `;
+    row.addEventListener('click', () => {
+      applyColorTheme(theme.id);
+      closeThemePanel();
+    });
+    panel.appendChild(row);
+  });
+}
+
+function toggleThemePanel() {
+  const panel = document.getElementById('theme-panel');
+  const arrow = document.getElementById('theme-trigger-arrow');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  if (arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+function closeThemePanel() {
+  const panel = document.getElementById('theme-panel');
+  const arrow = document.getElementById('theme-trigger-arrow');
+  panel.classList.remove('open');
+  if (arrow) arrow.classList.remove('open');
+}
+
+// ── SIDEBAR COLLAPSE ──────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const wrapper = document.getElementById('sidebar-wrapper');
+  const sidebar = document.getElementById('sidebar');
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  sidebar.classList.toggle('collapsed', !isCollapsed);
+  wrapper.classList.toggle('is-collapsed', !isCollapsed);
+  setTimeout(() => {
+    renderMonthLabels && renderMonthLabels();
+    renderCurrentDateMarker && renderCurrentDateMarker();
+    renderPhaseHeaders && renderPhaseHeaders();
+    renderPhaseBands && renderPhaseBands();
+    renderDateTicks && renderDateTicks();
+    renderEvents && renderEvents();
+  }, 320);
+}
+
+// Close panel on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#theme-trigger') && !e.target.closest('#theme-panel')) {
+    closeThemePanel();
+  }
+});
+
+// ── DATA ────────────────────────────────────────────────────────────────────
+
+// SVG icon paths for each event type (rendered in card header).
+// ── TYPE ICON SYSTEM ──────────────────────────────────────────────────────────
+// Icons are driven by shape key. Each POAM stores types as {name, shape}.
+// Shapes map to SVG templates; 'cos-star' is special (gold accent).
+const SHAPE_SVGS = {
+  'pentagon':       (c) => `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><polygon points="7,1 13,5.2 10.8,13 3.2,13 1,5.2" fill="${c}"/></svg>`,
+  'star':           (c) => `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="${c}"/></svg>`,
+  'cos-star':       (c, headerText) => headerText === '#ffffff'
+    ? `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="#ffba25"/></svg>`
+    : `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="none" stroke="#ffba25" stroke-width="1.2"/></svg>`,
+  'diamond':        (c) => `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><polygon points="7,1 13,7 7,13 1,7" fill="${c}"/></svg>`,
+  'circle':         (c) => `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><circle cx="7" cy="7" r="6" fill="${c}"/></svg>`,
+  'rounded-rect':   (c) => `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><rect x="1.5" y="1.5" width="11" height="11" rx="3.5" fill="${c}"/></svg>`,
+  'circle-outline': (c) => `<svg width="13" height="13" viewBox="0 0 14 14" style="flex-shrink:0"><circle cx="7" cy="7" r="5.5" fill="none" stroke="${c}" stroke-width="2"/></svg>`,
+};
+
+// Legend SVG (14x14, for the footer legend row)
+const SHAPE_LEGEND_SVGS = {
+  'pentagon':       (c) => `<svg class="legend-icon" viewBox="0 0 14 14"><polygon points="7,1 13,5.2 10.8,13 3.2,13 1,5.2" fill="${c}"/></svg>`,
+  'star':           (c) => `<svg class="legend-icon" viewBox="0 0 14 14"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="${c}"/></svg>`,
+  'cos-star':       ()  => `<svg class="legend-icon" viewBox="0 0 14 14"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="#ffba25"/></svg>`,
+  'diamond':        (c) => `<svg class="legend-icon" viewBox="0 0 14 14"><polygon points="7,1 13,7 7,13 1,7" fill="${c}"/></svg>`,
+  'circle':         (c) => `<svg class="legend-icon" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="${c}"/></svg>`,
+  'rounded-rect':   (c) => `<svg class="legend-icon" viewBox="0 0 14 14"><rect x="1.5" y="1.5" width="11" height="11" rx="3.5" fill="${c}"/></svg>`,
+  'circle-outline': (c) => `<svg class="legend-icon" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="${c}" stroke-width="2"/></svg>`,
+};
+
+// Shape picker SVG for the type editor UI (slightly larger, always dark)
+const SHAPE_PICKER_SVGS = {
+  'pentagon':       `<svg width="16" height="16" viewBox="0 0 14 14"><polygon points="7,1 13,5.2 10.8,13 3.2,13 1,5.2" fill="currentColor"/></svg>`,
+  'star':           `<svg width="16" height="16" viewBox="0 0 14 14"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="currentColor"/></svg>`,
+  'cos-star':       `<svg width="16" height="16" viewBox="0 0 14 14"><polygon points="7,0.5 8.7,5.2 13.5,5.2 9.7,8.3 11.1,13 7,10.1 2.9,13 4.3,8.3 0.5,5.2 5.3,5.2" fill="#ffba25"/></svg>`,
+  'diamond':        `<svg width="16" height="16" viewBox="0 0 14 14"><polygon points="7,1 13,7 7,13 1,7" fill="currentColor"/></svg>`,
+  'circle':         `<svg width="16" height="16" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="currentColor"/></svg>`,
+  'rounded-rect':   `<svg width="16" height="16" viewBox="0 0 14 14"><rect x="1.5" y="1.5" width="11" height="11" rx="3.5" fill="currentColor"/></svg>`,
+  'circle-outline': `<svg width="16" height="16" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>`,
+};
+
+const ALL_SHAPES = Object.keys(SHAPE_SVGS);
+const DEFAULT_TYPES = [
+  { name: 'Commander Event', shape: 'pentagon'       },
+  { name: 'DCOM Event',      shape: 'star'           },
+  { name: 'COS Event',       shape: 'cos-star'       },
+  { name: 'Executive Event', shape: 'diamond'        },
+  { name: '0-6 Event',       shape: 'circle'         },
+  { name: 'Standard Event',  shape: 'rounded-rect'   },
+  { name: 'Other',           shape: 'circle-outline' },
+];
+
+function getTypeIcon(typeName, headerText) {
+  const poam = getActivePoam();
+  const types = poam?.types || DEFAULT_TYPES;
+  const t = types.find(t => t.name === typeName);
+  if (!t) return '';
+  const iconColor = getIconColor(headerText);
+  const fn = SHAPE_SVGS[t.shape];
+  return fn ? fn(iconColor, headerText) : '';
+}
+
+// Rebuild all dynamic type-dependent UI for the active POAM
+function rebuildTypeUI() {
+  const poam = getActivePoam();
+  const types = poam?.types || DEFAULT_TYPES;
+
+  // 1. Sidebar add-event type select
+  const newType = document.getElementById('new-type');
+  if (newType) {
+    newType.innerHTML = '<option value="">Select Event Type</option>' +
+      types.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+  }
+
+  // 2. Edit modal type selects
+  ['modal-type', 'modal-type-range'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) {
+      const cur = sel.value;
+      sel.innerHTML = types.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+      if (cur) sel.value = cur;
+    }
+  });
+
+  // 3. Filter list
+  const filterList = document.getElementById('filter-list');
+  if (filterList) {
+    filterList.innerHTML = types.map(t =>
+      `<label class="filter-item"><input type="checkbox" checked onchange="filterEvents()"><span>${t.name}</span></label>`
+    ).join('');
+  }
+
+  // 4. Legend type row
+  const legendItems = document.getElementById('legend-type-items');
+  if (legendItems) {
+    legendItems.innerHTML = types.map(t => {
+      const svgFn = SHAPE_LEGEND_SVGS[t.shape];
+      const svg = svgFn ? svgFn(ICON_DARK) : '';
+      return `<div class="legend-item">${svg}${t.name}</div>`;
+    }).join('');
+  }
+}
+
+// Events and nextId are seeded from the active POAM in the registry
+let events = activePoamId ? (poamRegistry.find(p => p.id === activePoamId)?.events.map(e => ({ ...e })) || []) : [];
+let nextId = events.length ? Math.max(...events.map(e => e.id)) + 1 : 1;
+let editingId = null;
+
+// ── DYNAMIC DATE RANGE ───────────────────────────────────────────────────────
+// Always based on today: start = 15th of current month, end = 15th three months out
+const TODAY = new Date();
+TODAY.setHours(0,0,0,0);
+
+function buildTimelineRange() {
+  // Start: 15th of the month before today (or prev month if before 15th)
+  const start = new Date(TODAY.getFullYear(), TODAY.getMonth(), 15);
+  if (TODAY.getDate() < 15) start.setMonth(start.getMonth() - 1);
+
+  // End: at least 3 months out, but extend to cover all events + 1 month padding
+  let end = new Date(start);
+  end.setMonth(end.getMonth() + 3);
+
+  events.forEach(ev => {
+    const dateStr = ev.isRange ? ev.dateEnd : ev.date;
+    if (!dateStr) return;
+    const d = new Date(dateStr + 'T00:00:00');
+    const padded = new Date(d.getFullYear(), d.getMonth() + 2, 1);
+    if (padded > end) end = padded;
+  });
+
+  return { start, end };
+}
+
+// TIME_START/END/SPAN are recalculated whenever events change
+let TIME_START, TIME_END, TIME_SPAN;
+function recalcTimeRange() {
+  const r = buildTimelineRange();
+  TIME_START = r.start;
+  TIME_END   = r.end;
+  TIME_SPAN  = TIME_END.getTime() - TIME_START.getTime();
+}
+recalcTimeRange();
+
+function dateToXPct(dateStr) {
+  if (!dateStr) return 50;
+  const t = new Date(dateStr + 'T00:00:00').getTime();
+  return ((t - TIME_START.getTime()) / TIME_SPAN) * 100;
+}
+
+// Update month label positions dynamically
+function renderMonthLabels() {
+  const container = document.getElementById('month-markers');
+  if (!container) return;
+  container.innerHTML = '';
+  const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+  // Walk month by month — place label at the 1st of each month so it
+  // left-aligns with the day-number ticks that start at "1" for that month
+  const cursor = new Date(TIME_START.getFullYear(), TIME_START.getMonth() + 1, 1);
+  while (cursor < TIME_END) {
+    const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const pct = ((firstOfMonth.getTime() - TIME_START.getTime()) / TIME_SPAN) * 100;
+    if (pct >= 0 && pct <= 100) {
+      const span = document.createElement('span');
+      span.className = 'month-marker';
+      span.style.left = pct + '%';
+      span.textContent = MONTH_NAMES[cursor.getMonth()];
+      container.appendChild(span);
+    }
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+}
+
+// Current date marker
+function renderCurrentDateMarker() {
+  const marker = document.querySelector('.current-date-marker');
+  const label  = document.querySelector('.current-date-label');
+  if (!marker) return;
+  const pct = ((TODAY.getTime() - TIME_START.getTime()) / TIME_SPAN) * 100;
+  marker.style.left = Math.max(0, Math.min(100, pct)) + '%';
+  if (label) {
+    const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    label.textContent = `${TODAY.getDate()} ${MONTH_NAMES[TODAY.getMonth()]} ${TODAY.getFullYear()}`;
+  }
+}
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase();
+}
+
+// Card dimensions (px) — must match CSS
+const CARD_W = 175;
+const CARD_H = 74; // header ~22 + body ~52
+const STEM_BASE = 50;   // minimum stem length
+const STEM_STEP = 20;   // increment when collision detected
+const PAD_X = 8;        // horizontal clearance between cards
+const PAD_Y = 10;       // vertical clearance between card edge and timeline
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function renderEvents() {
+  const container = document.getElementById('events-container');
+  const area    = document.getElementById('timeline-area');
+  const canvas  = document.getElementById('timeline-canvas');
+  const areaW   = canvas.offsetWidth || area.offsetWidth || 1200;
+  const areaH   = area.offsetHeight || 400;
+  const midY    = areaH / 2;
+
+  // Lane offsets for range bars — floated above/below the timeline line
+  const BAR_H        = 22;
+  const BAR_LANE_OFF = 22;  // distance from midY to bar center
+  const BAR_STEP     = 30;  // additional offset per stacked lane
+
+  function dateToX(dateStr) {
+    if (!dateStr) return areaW * 0.5;
+    const t = new Date(dateStr + 'T00:00:00').getTime();
+    return ((t - TIME_START.getTime()) / TIME_SPAN) * areaW;
+  }
+
+  // Get active filter types
+  const checkboxes = document.querySelectorAll('#filter-list input[type=checkbox]');
+  const activeTypes = new Set();
+  checkboxes.forEach(cb => { if (cb.checked) activeTypes.add(cb.nextElementSibling.textContent.trim()); });
+
+  const visible = events
+    .filter(ev => activeTypes.has(ev.type))
+    .sort((a, b) => new Date(a.date || a.dateStart) - new Date(b.date || b.dateStart));
+
+  container.innerHTML = '';
+
+  // ── Separate point vs range events ──
+  const pointEvents = visible.filter(ev => !ev.isRange);
+  const rangeEvents = visible.filter(ev => ev.isRange);
+
+  // ── Collision-aware placement for point event cards ──
+  // For each event (sorted by date), try preferred side at STEM_BASE first.
+  // Swap sides if preferred is blocked and opposite is free. Then bump stem if needed.
+  const placedAbove = [];
+  const placedBelow = [];
+
+  function cardOverlaps(placed, cx1, cx2, stemLen) {
+    const nearEdge = stemLen + PAD_Y;
+    const farEdge  = nearEdge + CARD_H;
+    for (const p of placed) {
+      const xOverlap = cx1 < p.x2 + PAD_X && cx2 > p.x1 - PAD_X;
+      const yOverlap = nearEdge < p.farEdge + PAD_Y && farEdge > p.nearEdge - PAD_Y;
+      if (xOverlap && yOverlap) return true;
+    }
+    return false;
+  }
+
+  let preferAbove = true;
+  pointEvents.forEach(ev => {
+    const dotX = dateToX(ev.date);
+    const cx1  = Math.max(0, Math.min(areaW - CARD_W, dotX - CARD_W / 2));
+    const cx2  = cx1 + CARD_W;
+
+    const prefAboveFree = !cardOverlaps(placedAbove, cx1, cx2, STEM_BASE);
+    const prefBelowFree = !cardOverlaps(placedBelow, cx1, cx2, STEM_BASE);
+
+    let isAbove;
+    if (preferAbove) {
+      isAbove = !((!prefAboveFree) && prefBelowFree);
+    } else {
+      isAbove = (!prefBelowFree) && prefAboveFree;
+    }
+
+    ev._above = isAbove;
+    preferAbove = !isAbove;
+  });
+
+  // ── Render RANGE events ──
+  // Lane collision: track occupied x-ranges per lane slot above/below
+  const rangeLanesAbove = []; // each entry: array of {x1,x2} segments
+  const rangeLanesBelow = [];
+
+  rangeEvents.forEach(ev => {
+    const cfg   = priorityConfig[ev.priority] || priorityConfig.low;
+    const barX1 = Math.max(0, dateToX(ev.dateStart));
+    const barX2 = Math.min(areaW, dateToX(ev.dateEnd));
+    if (barX2 <= barX1) return;
+    const barW  = barX2 - barX1;
+    const midX  = barX1 + barW / 2;
+
+    // Assign to above or below based on card collision (alternate)
+    const isAbove = (rangeEvents.indexOf(ev) % 2 === 0);
+    const lanes   = isAbove ? rangeLanesAbove : rangeLanesBelow;
+
+    // Find first lane where this bar fits
+    let laneIdx = 0;
+    while (true) {
+      if (!lanes[laneIdx]) lanes[laneIdx] = [];
+      const fits = !lanes[laneIdx].some(seg => barX1 < seg.x2 + PAD_X && barX2 > seg.x1 - PAD_X);
+      if (fits) break;
+      laneIdx++;
+    }
+    lanes[laneIdx].push({ x1: barX1, x2: barX2 });
+
+    const laneOffset = BAR_LANE_OFF + laneIdx * BAR_STEP;
+    const barY = isAbove ? midY - laneOffset : midY + laneOffset;
+
+    // ── Bar ──
+    const bar = document.createElement('div');
+    bar.className = 'range-bar-lane';
+    bar.style.left        = barX1 + 'px';
+    bar.style.width       = barW + 'px';
+    bar.style.top         = (barY - BAR_H / 2) + 'px';
+    bar.style.border      = `2px solid ${cfg.header}`;
+    bar.addEventListener('click', () => openModal(ev.id));
+
+    // Label inside bar (only if wide enough)
+    if (barW > 40) {
+      const lbl = document.createElement('div');
+      lbl.className = 'range-bar-label';
+      lbl.textContent = ev.name;
+      bar.appendChild(lbl);
+    }
+    container.appendChild(bar);
+
+    // ── Stem from bar midpoint to timeline line ──
+    const stemTop    = isAbove ? midY : barY + BAR_H / 2;
+    const stemBottom = isAbove ? barY - BAR_H / 2 : midY;
+    const stemHeight = stemBottom - stemTop;
+
+    const stem = document.createElement('div');
+    stem.className = 'range-stem';
+    stem.style.left       = midX + 'px';
+    stem.style.top        = stemTop + 'px';
+    stem.style.height     = stemHeight + 'px';
+    stem.style.background = cfg.header;
+    stem.style.opacity    = '0.35';
+    container.appendChild(stem);
+
+    // ── Card (floating above/below the bar) ──
+    const cardX1     = Math.max(0, Math.min(areaW - CARD_W, midX - CARD_W / 2));
+    const stemToCard = laneOffset + BAR_H / 2 + PAD_Y + 6;
+
+    // ── Stem from bar edge to card ──
+    const cardStemX      = midX;
+    const cardStemLength = PAD_Y + 6;
+    const cardStemTop    = isAbove
+      ? midY - laneOffset - BAR_H / 2 - cardStemLength
+      : midY + laneOffset + BAR_H / 2;
+
+    const cardStem = document.createElement('div');
+    cardStem.className = 'range-stem';
+    cardStem.style.left       = cardStemX + 'px';
+    cardStem.style.top        = cardStemTop + 'px';
+    cardStem.style.height     = cardStemLength + 'px';
+    cardStem.style.background = cfg.header;
+    cardStem.style.opacity    = '0.5';
+    container.appendChild(cardStem);
+
+    const card = document.createElement('div');
+    card.className = `event-card priority-${ev.priority}`;
+    card.style.position = 'absolute';
+    card.style.setProperty('--card-border-color', cfg.border);
+    card.style.setProperty('--card-header-color', cfg.header);
+    card.style.left      = cardX1 + 'px';
+    card.style.width     = CARD_W + 'px';
+    card.style.transform = 'none';
+
+    if (isAbove) {
+      card.style.top    = 'auto';
+      card.style.bottom = (areaH - midY + stemToCard) + 'px';
+    } else {
+      card.style.top    = (midY + stemToCard) + 'px';
+      card.style.bottom = 'auto';
+    }
+
+    const iconColor = getIconColor(cfg.headerText);
+    card.innerHTML = `
+      <div class="event-card-header" style="background:${cfg.header};color:${cfg.headerText}">
+        <span class="event-name-text">${ev.name}</span>
+        <span style="flex-shrink:0;display:flex;align-items:center;color:${iconColor}">${getTypeIcon(ev.type, cfg.headerText)}</span>
+      </div>
+      <div class="event-card-body">
+        <div class="event-card-date" style="font-size:10px;">${formatDate(ev.dateStart)} – ${formatDate(ev.dateEnd)}</div>
+        <div class="event-card-desc">${ev.desc}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => openModal(ev.id));
+    container.appendChild(card);
+
+    // Register range card footprint into shared pools so point events avoid it
+    const rcx1  = Math.max(0, Math.min(areaW - CARD_W, midX - CARD_W / 2));
+    const rcx2  = rcx1 + CARD_W;
+    const rcNear = stemToCard;
+    const rcFar  = stemToCard + CARD_H;
+    (isAbove ? placedAbove : placedBelow).push({ x1: rcx1, x2: rcx2, nearEdge: rcNear, farEdge: rcFar });
+  });
+
+  // ── Render POINT events ──
+  pointEvents.forEach(ev => {
+    const cfg     = priorityConfig[ev.priority] || priorityConfig.low;
+    const isAbove = ev._above;
+    const dotX    = dateToX(ev.date);
+
+    const cardX1 = Math.max(0, Math.min(areaW - CARD_W, dotX - CARD_W / 2));
+    const cardX2 = cardX1 + CARD_W;
+
+    const placed = isAbove ? placedAbove : placedBelow;
+    let stemLen = STEM_BASE;
+
+    while (cardOverlaps(placed, cardX1, cardX2, stemLen)) stemLen += STEM_STEP;
+    placed.push({ x1: cardX1, x2: cardX2, nearEdge: stemLen + PAD_Y, farEdge: stemLen + PAD_Y + CARD_H });
+
+    const nodeEl = document.createElement('div');
+    nodeEl.className = 'event-node' + (ev.priority === 'emergency' ? ' missed' : '');
+    nodeEl.style.left = dotX + 'px';
+    nodeEl.style.top  = midY + 'px';
+    nodeEl.style.position = 'absolute';
+
+    const stem = document.createElement('div');
+    stem.className = 'event-stem ' + (isAbove ? 'up' : 'down');
+    stem.style.height = stemLen + 'px';
+    stem.style.background = ev.priority === 'emergency' ? '#c6530c' : '#b0c8cf';
+    nodeEl.appendChild(stem);
+
+    const dot = document.createElement('div');
+    dot.className = 'event-dot';
+    dot.style.background = cfg.header;
+    dot.style.boxShadow  = `0 0 0 2px ${cfg.border}`;
+    nodeEl.appendChild(dot);
+
+    const card = document.createElement('div');
+    card.className = `event-card priority-${ev.priority}`;
+    card.style.setProperty('--card-border-color', cfg.border);
+    card.style.setProperty('--card-header-color', cfg.header);
+
+    const cardOffsetX = cardX1 - dotX;
+    card.style.left      = cardOffsetX + 'px';
+    card.style.transform = 'none';
+    card.style.width     = CARD_W + 'px';
+
+    if (isAbove) {
+      card.style.bottom = (stemLen + PAD_Y) + 'px';
+      card.style.top    = 'auto';
+    } else {
+      card.style.top    = (stemLen + PAD_Y) + 'px';
+      card.style.bottom = 'auto';
+    }
+
+    const iconColor = getIconColor(cfg.headerText);
+    card.innerHTML = `
+      <div class="event-card-header" style="background:${cfg.header};color:${cfg.headerText}">
+        <span class="event-name-text">${ev.name}</span>
+        <span style="flex-shrink:0;display:flex;align-items:center;color:${iconColor}">${getTypeIcon(ev.type, cfg.headerText)}</span>
+      </div>
+      <div class="event-card-body">
+        <div class="event-card-date">${formatDate(ev.date)}</div>
+        <div class="event-card-desc">${ev.desc}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => openModal(ev.id));
+    nodeEl.appendChild(card);
+    container.appendChild(nodeEl);
+  });
+}
+
+// ── MODAL ────────────────────────────────────────────────────────────────────
+let currentPriority = 'medium';
+
+function openModal(id) {
+  const ev = events.find(e => e.id === id);
+  if (!ev) return;
+  editingId = id;
+
+  const cfg = priorityConfig[ev.priority] || priorityConfig.medium;
+  document.getElementById('modal-header').style.background = cfg.header;
+  document.getElementById('modal-header').style.color = cfg.headerText;
+  document.getElementById('modal-title').textContent = 'Edit Event';
+  document.getElementById('modal-name').value = ev.name;
+  document.getElementById('modal-desc').value = ev.desc;
+  currentPriority = ev.priority;
+  updatePriorityChips();
+
+  if (ev.isRange) {
+    setModalDateMode('range');
+    document.getElementById('modal-date-start').value = ev.dateStart || '';
+    document.getElementById('modal-date-end').value   = ev.dateEnd   || '';
+    document.getElementById('modal-type-range').value = ev.type;
+  } else {
+    setModalDateMode('single');
+    document.getElementById('modal-date').value = ev.date || '';
+    document.getElementById('modal-type').value = ev.type;
+  }
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  editingId = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+function selectPriority(p) {
+  currentPriority = p;
+  updatePriorityChips();
+  const cfg = priorityConfig[p];
+  document.getElementById('modal-header').style.background = cfg.header;
+  document.getElementById('modal-header').style.color = cfg.headerText;
+}
+
+function updatePriorityChips() {
+  document.querySelectorAll('.priority-chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.priority === currentPriority);
+  });
+}
+
+function saveModal() {
+  if (editingId === null) return;
+  const ev = events.find(e => e.id === editingId);
+  if (!ev) return;
+  ev.name     = document.getElementById('modal-name').value.trim() || ev.name;
+  ev.desc     = document.getElementById('modal-desc').value.trim();
+  ev.priority = currentPriority;
+  ev.missed   = currentPriority === 'emergency';
+
+  if (_modalDateMode === 'range') {
+    ev.isRange   = true;
+    ev.dateStart = document.getElementById('modal-date-start').value;
+    ev.dateEnd   = document.getElementById('modal-date-end').value;
+    ev.date      = ev.dateStart;
+    ev.type      = document.getElementById('modal-type-range').value;
+  } else {
+    ev.isRange   = false;
+    ev.date      = document.getElementById('modal-date').value;
+    ev.dateStart = null;
+    ev.dateEnd   = null;
+    ev.type      = document.getElementById('modal-type').value;
+  }
+
+  closeModal();
+  recalcTimeRange();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+}
+
+// ── ADD EVENT ────────────────────────────────────────────────────────────────
+// ── DATE MODE TOGGLE ─────────────────────────────────────────────────────────
+let _sidebarDateMode = 'single';
+let _modalDateMode   = 'single';
+
+function setSidebarDateMode(mode) {
+  _sidebarDateMode = mode;
+  document.querySelectorAll('#sidebar-date-mode-toggle .date-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  document.getElementById('sidebar-date-single').style.display  = mode === 'single' ? '' : 'none';
+  document.getElementById('sidebar-date-range').style.display   = mode === 'range'  ? 'flex' : 'none';
+}
+
+function setModalDateMode(mode) {
+  _modalDateMode = mode;
+  document.querySelectorAll('#modal-date-mode-toggle .date-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  document.getElementById('modal-date-single-row').style.display = mode === 'single' ? '' : 'none';
+  document.getElementById('modal-date-range-row').style.display  = mode === 'range'  ? '' : 'none';
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('validation-toast');
+  const msgEl = document.getElementById('validation-toast-msg');
+  msgEl.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.remove('show'), 3200);
+}
+
+function addEvent() {
+  const name     = document.getElementById('new-name').value.trim();
+  const desc     = document.getElementById('new-desc').value.trim();
+  const priority = document.getElementById('new-priority').value || 'lowest';
+  const type     = document.getElementById('new-type').value || 'Standard Event';
+
+  // Validate name
+  if (!name) {
+    showToast('An Event Name is required before adding.');
+    document.getElementById('new-name').focus();
+    return;
+  }
+
+  // Validate date
+  if (_sidebarDateMode === 'range') {
+    const dateStart = document.getElementById('new-date-start').value;
+    const dateEnd   = document.getElementById('new-date-end').value;
+    if (!dateStart || !dateEnd) {
+      showToast('A Start Date and End Date are required.');
+      document.getElementById(!dateStart ? 'new-date-start' : 'new-date-end').focus();
+      return;
+    }
+    const ev = { id: nextId++, name, dateStart, dateEnd, desc, priority, type, isRange: true };
+    events.push(ev);
+    document.getElementById('new-date-start').value = '';
+    document.getElementById('new-date-end').value   = '';
+  } else {
+    const date = document.getElementById('new-date').value;
+    if (!date) {
+      showToast('A Date is required before adding an event.');
+      document.getElementById('new-date').focus();
+      return;
+    }
+    const ev = { id: nextId++, name, date, desc, priority, type, isRange: false };
+    events.push(ev);
+    document.getElementById('new-date').value = '';
+  }
+
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-desc').value = '';
+  recalcTimeRange();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+}
+
+function deleteEvent() {
+  if (editingId === null) return;
+  events = events.filter(e => e.id !== editingId);
+  closeModal();
+  recalcTimeRange();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+}
+
+function filterEvents() { renderEvents(); }
+
+// ── PHASE BANDS ──────────────────────────────────────────────────────────────
+// Seeded from the active POAM in the registry
+let phases = activePoamId ? (poamRegistry.find(p => p.id === activePoamId)?.phases.map(p => ({ ...p })) || []) : [];
+
+function renderPhaseBands() {
+  const area   = document.getElementById('timeline-area');
+  const canvas = document.getElementById('timeline-canvas');
+  const areaW  = canvas.offsetWidth || area.offsetWidth || 1200;
+  const container = document.getElementById('phase-bands');
+  container.innerHTML = '';
+
+  phases.forEach((ph, i) => {
+    const x1 = ((new Date(ph.start).getTime() - TIME_START.getTime()) / TIME_SPAN) * areaW;
+    const x2 = ((new Date(ph.end  ).getTime() - TIME_START.getTime()) / TIME_SPAN) * areaW;
+    const band = document.createElement('div');
+    band.className = 'phase-band ' + (i % 2 === 0 ? 'odd' : 'even');
+    band.style.left  = x1 + 'px';
+    band.style.width = (x2 - x1) + 'px';
+    container.appendChild(band);
+  });
+}
+
+// ── DATE TICKS ───────────────────────────────────────────────────────────────
+function renderDateTicks() {
+  const area      = document.getElementById('timeline-area');
+  const canvas    = document.getElementById('timeline-canvas');
+  const areaW     = canvas.offsetWidth || area.offsetWidth || 1200;
+  const container = document.getElementById('date-ticks');
+  container.innerHTML = '';
+
+  const totalDays = TIME_SPAN / 86400000;
+  const pxPerDay  = areaW / totalDays;
+
+  // Adaptive tick density based on pixels-per-day
+  // majorInterval = labeled ticks, minorInterval = small unlabeled ticks
+  let majorInterval, minorInterval;
+  if      (pxPerDay >= 28)  { majorInterval = 1;  minorInterval = 1;  }
+  else if (pxPerDay >= 14)  { majorInterval = 2;  minorInterval = 1;  }
+  else if (pxPerDay >= 7)   { majorInterval = 5;  minorInterval = 1;  }
+  else if (pxPerDay >= 3.5) { majorInterval = 5;  minorInterval = 5;  }
+  else if (pxPerDay >= 2)   { majorInterval = 7;  minorInterval = 7;  }
+  else if (pxPerDay >= 1)   { majorInterval = 15; minorInterval = 15; }
+  else                      { majorInterval = 15; minorInterval = 15; }
+
+  const start   = TIME_START.getTime();
+  const end     = TIME_END.getTime();
+  const cursor  = new Date(TIME_START);
+  cursor.setHours(0, 0, 0, 0);
+
+  while (cursor.getTime() <= end) {
+    const t   = cursor.getTime();
+    const day = cursor.getDate();
+    let isMajor = false;
+    let isMinor = false;
+
+    if (minorInterval < 7) {
+      if ((day - 1) % minorInterval === 0) isMinor = true;
+      if ((day - 1) % majorInterval === 0) isMajor = true;
+    } else if (minorInterval === 7) {
+      if (cursor.getDay() === 1) { isMinor = true; isMajor = true; }
+    } else {
+      if (day === 1 || day === 15) { isMinor = true; isMajor = true; }
+    }
+
+    if ((isMajor || isMinor) && t >= start) {
+      const xPct = ((t - start) / TIME_SPAN) * 100;
+      const tick = document.createElement('div');
+      tick.className = 'date-tick' + (isMajor ? '' : ' date-tick-minor');
+      tick.style.left = xPct + '%';
+      tick.innerHTML = isMajor
+        ? `<div class="date-tick-line"></div><div class="date-tick-label">${day}</div>`
+        : `<div class="date-tick-line"></div>`;
+      container.appendChild(tick);
+    }
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+}
+
+// ── PHASE HEADERS (aligned to bands) ─────────────────────────────────────────
+function renderPhaseHeaders() {
+  const area   = document.getElementById('timeline-area');
+  const canvas = document.getElementById('timeline-canvas');
+  const areaW  = canvas.offsetWidth || area.offsetWidth || 1200;
+  const container = document.getElementById('phase-regions');
+  container.innerHTML = '';
+
+  phases.forEach((ph, i) => {
+    const x1 = ((new Date(ph.start).getTime() - TIME_START.getTime()) / TIME_SPAN) * areaW;
+    const x2 = ((new Date(ph.end  ).getTime() - TIME_START.getTime()) / TIME_SPAN) * areaW;
+    const el = document.createElement('div');
+    el.className = 'phase-region ' + (i % 2 === 0 ? 'odd-phase' : 'even-phase');
+    el.style.left  = x1 + 'px';
+    el.style.width = (x2 - x1) + 'px';
+    el.textContent = ph.label;
+    container.appendChild(el);
+  });
+}
+
+// ── DRAGGABLE MODAL ───────────────────────────────────────────────────────────
+(function() {
+  let dragging = false, startX, startY, origLeft, origTop;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const header = document.getElementById('modal-header');
+    const modal  = document.getElementById('modal');
+
+    header.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('modal-close')) return;
+      dragging = true;
+      modal.classList.add('dragging');
+      const rect = modal.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      origLeft = rect.left;
+      origTop  = rect.top;
+      // Switch from centered (transform) to absolute position
+      modal.style.left      = origLeft + 'px';
+      modal.style.top       = origTop  + 'px';
+      modal.style.marginLeft = '0';
+      modal.style.marginTop  = '0';
+      modal.style.transform  = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      modal.style.left = (origLeft + dx) + 'px';
+      modal.style.top  = (origTop  + dy) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (dragging) { dragging = false; modal.classList.remove('dragging'); }
+    });
+  });
+})();
+
+
+// ── CREATE POAM MODAL ─────────────────────────────────────────────────────────
+function openCreateModal() {
+  const overlay = document.getElementById('create-modal-overlay');
+  overlay.classList.add('open');
+  document.getElementById('create-poam-name').focus();
+  document.getElementById('phase-date-fields').innerHTML = '';
+  document.getElementById('create-poam-phases').value = '';
+}
+
+function closeCreateModal() {
+  document.getElementById('create-modal-overlay').classList.remove('open');
+  document.getElementById('create-poam-name').value = '';
+  document.getElementById('create-poam-phases').value = '';
+  document.getElementById('phase-date-fields').innerHTML = '';
+  document.getElementById('create-type-rows').innerHTML = '';
+  document.getElementById('create-types-section').style.display = 'none';
+}
+
+function handleCreateOverlayClick(e) {
+  if (e.target === document.getElementById('create-modal-overlay')) closeCreateModal();
+}
+
+function buildPhaseFields() {
+  const count = parseInt(document.getElementById('create-poam-phases').value, 10);
+  const container = document.getElementById('phase-date-fields');
+  container.innerHTML = '';
+  if (!count) return;
+
+  // Default: start from today, each phase = 30 days
+  const baseDate = new Date(TODAY);
+
+  for (let i = 0; i < count; i++) {
+    const phaseStart = new Date(baseDate);
+    phaseStart.setDate(phaseStart.getDate() + i * 30);
+    const phaseEnd = new Date(phaseStart);
+    phaseEnd.setDate(phaseEnd.getDate() + 30);
+
+    const toISO = d => d.toISOString().split('T')[0];
+
+    const block = document.createElement('div');
+    block.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+    block.innerHTML = `
+      <div class="modal-label" style="color:#4db8c8; letter-spacing:0.1em;">PHASE ${i + 1}</div>
+      <div class="modal-field">
+        <label class="modal-label">Phase Name</label>
+        <input type="text" class="modal-input phase-label" data-phase="${i}" value="PHASE ${i + 1}" maxlength="30" placeholder="Phase name…" style="font-size:12px;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="modal-field">
+          <label class="modal-label">Start Date</label>
+          <input type="date" class="modal-input phase-start" data-phase="${i}" value="${toISO(phaseStart)}" style="font-size:12px;">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">End Date</label>
+          <input type="date" class="modal-input phase-end" data-phase="${i}" value="${toISO(phaseEnd)}" style="font-size:12px;">
+        </div>
+      </div>
+    `;
+    container.appendChild(block);
+
+    // Thin divider between phases
+    if (i < count - 1) {
+      const hr = document.createElement('div');
+      hr.style.cssText = 'height:1px; background:rgba(77,184,200,0.15); margin:2px 0;';
+      container.appendChild(hr);
+    }
+  }
+}
+
+function confirmCreatePoam() {
+  const name  = document.getElementById('create-poam-name').value.trim();
+  const count = parseInt(document.getElementById('create-poam-phases').value, 10);
+
+  if (!name)  { document.getElementById('create-poam-name').focus(); return; }
+  if (!count) { document.getElementById('create-poam-phases').focus(); return; }
+
+  // Collect phase dates
+  const labelInputs = document.querySelectorAll('.phase-label');
+  const startInputs = document.querySelectorAll('.phase-start');
+  const endInputs   = document.querySelectorAll('.phase-end');
+  const newPhases   = [];
+
+  for (let i = 0; i < count; i++) {
+    const s = startInputs[i]?.value;
+    const e = endInputs[i]?.value;
+    if (!s || !e) {
+      startInputs[i]?.focus();
+      return;
+    }
+    const label = labelInputs[i]?.value.trim() || `PHASE ${i + 1}`;
+    newPhases.push({ label, start: s, end: e });
+  }
+
+  // Collect types from the type editor step
+  const typeRows = document.querySelectorAll('#create-type-rows .type-editor-row');
+  const newTypes = [];
+  typeRows.forEach(row => {
+    const nameVal  = row.querySelector('.ct-name')?.value.trim();
+    const shapeVal = row.querySelector('.ct-shape-input:checked')?.value;
+    if (nameVal && shapeVal) newTypes.push({ name: nameVal, shape: shapeVal });
+  });
+  const finalTypes = newTypes.length ? newTypes : [{ name: 'Standard Event', shape: 'rounded-rect' }];
+
+  // Apply to app state
+  // 1. Save current POAM state back to registry
+  const current = getActivePoam();
+  if (current) {
+    current.events = events.map(e => ({ ...e }));
+    current.phases = phases.map(p => ({ ...p }));
+  }
+
+  // 2. Register new POAM
+  const newId = 'poam-' + Date.now();
+  const newPoam = { id: newId, name, phases: newPhases, types: finalTypes, events: [] };
+  poamRegistry.push(newPoam);
+  activePoamId = newId;
+
+  // 3. Update switcher display
+  document.getElementById('poam-switcher-name').textContent = name;
+  document.getElementById('poam-switcher-name').style.opacity = '';
+  document.getElementById('poam-switcher-name').style.fontStyle = '';
+  document.getElementById('poam-switcher-meta').textContent = count + ' Phase' + (count !== 1 ? 's' : '');
+
+  // Hide empty state, restore timeline chrome
+  document.getElementById('empty-state').classList.add('hidden');
+  document.querySelector('.timeline-line').style.display = '';
+  document.querySelector('.current-date-marker').style.display = '';
+  document.getElementById('edit-phases-trigger').style.display = 'block';
+
+  // Rebuild type UI for new POAM
+  rebuildTypeUI();
+
+  // 4. Clear events
+  events = [];
+  nextId = 1;
+
+  // 5. Replace phase data
+  phases.length = 0;
+  newPhases.forEach(p => phases.push(p));
+
+  // 4. Re-render everything
+  recalcTimeRange();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+
+  closeCreateModal();
+}
+
+// ── TIMELINE ZOOM (AE-style) ──────────────────────────────────────────────────
+// zoomLevel: multiplier applied to the natural canvas width
+window._timelineZoom = 1;
+
+function getBaseCanvasWidth() {
+  // Natural width: wrapper width is 100%, treat it as the 100% baseline
+  const wrapper = document.getElementById('timeline-wrapper');
+  return wrapper ? wrapper.clientWidth || 1200 : 1200;
+}
+
+function applyZoom(anchorRatio) {
+  const wrapper = document.getElementById('timeline-wrapper');
+  const canvas  = document.getElementById('timeline-canvas');
+  if (!wrapper || !canvas) return;
+
+  const baseW   = getBaseCanvasWidth();
+  const newW    = Math.round(baseW * window._timelineZoom);
+  canvas.style.minWidth = newW + 'px';
+  document.getElementById('zoom-label').textContent = Math.round(window._timelineZoom * 100) + '%';
+
+  // Re-render so all % positions recalculate against new pixel width
+  recalcTimeRange();
+  renderMonthLabels && renderMonthLabels();
+  renderCurrentDateMarker && renderCurrentDateMarker();
+  renderPhaseHeaders && renderPhaseHeaders();
+  renderPhaseBands  && renderPhaseBands();
+  renderDateTicks   && renderDateTicks();
+  renderEvents      && renderEvents();
+
+  // Restore scroll anchor
+  if (anchorRatio !== undefined) {
+    wrapper.scrollLeft = anchorRatio * newW - wrapper.clientWidth / 2;
+  }
+}
+
+window.adjustZoom = function(delta) {
+  const wrapper = document.getElementById('timeline-wrapper');
+  const baseW   = getBaseCanvasWidth();
+  const currentW = baseW * window._timelineZoom;
+  const anchorRatio = (wrapper.scrollLeft + wrapper.clientWidth / 2) / currentW;
+
+  window._timelineZoom = Math.min(8, Math.max(0.25, window._timelineZoom + delta));
+  applyZoom(anchorRatio);
+};
+
+// Ctrl/Cmd + scroll wheel = zoom toward mouse; plain scroll = pan
+(function() {
+  const wrapper = document.getElementById('timeline-wrapper');
+  if (!wrapper) return;
+  wrapper.addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const rect     = wrapper.getBoundingClientRect();
+      const baseW    = getBaseCanvasWidth();
+      const currentW = baseW * window._timelineZoom;
+      const mouseRatio = (wrapper.scrollLeft + (e.clientX - rect.left)) / currentW;
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      window._timelineZoom = Math.min(8, Math.max(0.25, window._timelineZoom + delta));
+      const newW = baseW * window._timelineZoom;
+      const canvas = document.getElementById('timeline-canvas');
+      canvas.style.minWidth = Math.round(newW) + 'px';
+      document.getElementById('zoom-label').textContent = Math.round(window._timelineZoom * 100) + '%';
+      recalcTimeRange();
+      renderMonthLabels && renderMonthLabels();
+      renderCurrentDateMarker && renderCurrentDateMarker();
+      renderPhaseHeaders && renderPhaseHeaders();
+      renderPhaseBands  && renderPhaseBands();
+      renderDateTicks   && renderDateTicks();
+      renderEvents      && renderEvents();
+      wrapper.scrollLeft = mouseRatio * newW - (e.clientX - rect.left);
+    }
+  }, { passive: false });
+})();
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  applyColorTheme('slate-ember'); // seed priorityConfig with default theme
+  buildThemePanel();
+
+  // Show empty state if no POAM is active on load
+  if (!activePoamId) {
+    document.getElementById('empty-state').classList.remove('hidden');
+    // Hide timeline chrome elements
+    document.querySelector('.timeline-line').style.display = 'none';
+    document.querySelector('.current-date-marker').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('empty-state').classList.add('hidden');
+  rebuildTypeUI();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+  window.addEventListener('resize', () => {
+    renderMonthLabels();
+    renderCurrentDateMarker();
+    renderPhaseHeaders();
+    renderPhaseBands();
+    renderDateTicks();
+    renderEvents();
+  });
+});
+
+// ── DELETE POAM ───────────────────────────────────────────────────────────────
+let _deleteTargetId = null;
+
+function openDeletePoamModal(id, name) {
+  _deleteTargetId = id;
+  document.getElementById('delete-poam-label').textContent = name;
+  document.getElementById('delete-poam-overlay').classList.add('open');
+  closePoamSwitcher();
+}
+
+function closeDeletePoamModal() {
+  document.getElementById('delete-poam-overlay').classList.remove('open');
+  _deleteTargetId = null;
+}
+
+function handleDeletePoamOverlayClick(e) {
+  if (e.target === document.getElementById('delete-poam-overlay')) closeDeletePoamModal();
+}
+
+function confirmDeletePoam() {
+  if (!_deleteTargetId) return;
+
+  const idx = poamRegistry.findIndex(p => p.id === _deleteTargetId);
+  if (idx === -1) { closeDeletePoamModal(); return; }
+
+  const wasActive = _deleteTargetId === activePoamId;
+  poamRegistry.splice(idx, 1);
+
+  if (wasActive) {
+    if (poamRegistry.length > 0) {
+      // Switch to the first remaining POAM
+      closeDeletePoamModal();
+      // Reset state then switch
+      activePoamId = null;
+      events = [];
+      phases.length = 0;
+      switchPoam(poamRegistry[0].id);
+    } else {
+      // No POAMs left — return to blank canvas
+      activePoamId = null;
+      events = [];
+      nextId = 1;
+      phases.length = 0;
+
+      document.getElementById('poam-switcher-name').textContent = 'Select a POAM…';
+      document.getElementById('poam-switcher-name').style.opacity = '0.55';
+      document.getElementById('poam-switcher-name').style.fontStyle = 'italic';
+      document.getElementById('poam-switcher-meta').textContent = '';
+      document.getElementById('edit-phases-trigger').style.display = 'none';
+
+      // Clear timeline
+      document.getElementById('phase-regions').innerHTML = '';
+      document.getElementById('phase-bands').innerHTML = '';
+      document.getElementById('month-markers').innerHTML = '';
+      document.getElementById('date-ticks').innerHTML = '';
+      document.getElementById('events-container').innerHTML = '';
+      document.querySelector('.timeline-line').style.display = 'none';
+      document.querySelector('.current-date-marker').style.display = 'none';
+      document.getElementById('empty-state').classList.remove('hidden');
+
+      // Clear type UI
+      document.getElementById('legend-type-items').innerHTML = '';
+      document.getElementById('filter-list').innerHTML = '';
+      document.getElementById('new-type').innerHTML = '<option value="">Select Event Type</option>';
+    }
+  }
+
+  closeDeletePoamModal();
+}
+
+function openEditPhasesModal() {
+  const poam = getActivePoam();
+  if (!poam) return;
+
+  const container = document.getElementById('edit-phase-fields');
+  container.innerHTML = '';
+
+  poam.phases.forEach((ph, i) => {
+    const block = document.createElement('div');
+    block.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+    block.innerHTML = `
+      <div class="modal-label" style="color:#4db8c8; letter-spacing:0.1em;">PHASE ${i + 1}</div>
+      <div class="modal-field">
+        <label class="modal-label">Phase Name</label>
+        <input type="text" class="modal-input ep-label" data-phase="${i}" value="${ph.label}" maxlength="30" placeholder="Phase name…" style="font-size:12px;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="modal-field">
+          <label class="modal-label">Start Date</label>
+          <input type="date" class="modal-input ep-start" data-phase="${i}" value="${ph.start}" style="font-size:12px;">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">End Date</label>
+          <input type="date" class="modal-input ep-end" data-phase="${i}" value="${ph.end}" style="font-size:12px;">
+        </div>
+      </div>
+    `;
+    container.appendChild(block);
+
+    if (i < poam.phases.length - 1) {
+      const hr = document.createElement('div');
+      hr.style.cssText = 'height:1px; background:rgba(77,184,200,0.15); margin:2px 0;';
+      container.appendChild(hr);
+    }
+  });
+
+  document.getElementById('edit-phases-overlay').classList.add('open');
+}
+
+function closeEditPhasesModal() {
+  document.getElementById('edit-phases-overlay').classList.remove('open');
+}
+
+function handleEditPhasesOverlayClick(e) {
+  if (e.target === document.getElementById('edit-phases-overlay')) closeEditPhasesModal();
+}
+
+function confirmEditPhases() {
+  const poam = getActivePoam();
+  if (!poam) return;
+
+  const labelInputs = document.querySelectorAll('.ep-label');
+  const startInputs = document.querySelectorAll('.ep-start');
+  const endInputs   = document.querySelectorAll('.ep-end');
+
+  const updated = [];
+  for (let i = 0; i < poam.phases.length; i++) {
+    const s = startInputs[i]?.value;
+    const e = endInputs[i]?.value;
+    if (!s || !e) { startInputs[i]?.focus(); return; }
+    const label = labelInputs[i]?.value.trim() || `PHASE ${i + 1}`;
+    updated.push({ label, start: s, end: e });
+  }
+
+  // Apply to live phases and registry
+  phases.length = 0;
+  updated.forEach(p => phases.push(p));
+  poam.phases = updated.map(p => ({ ...p }));
+
+  // Re-render timeline
+  recalcTimeRange();
+  renderMonthLabels();
+  renderCurrentDateMarker();
+  renderPhaseHeaders();
+  renderPhaseBands();
+  renderDateTicks();
+  renderEvents();
+
+  closeEditPhasesModal();
+}
+
+// ── EVENT TYPE EDITOR ─────────────────────────────────────────────────────────
+
+// Build a single type row with name input + shape picker
+// context: 'create' (in create modal) or 'edit' (in edit-types modal)
+function buildTypeRow(t, index, context, removable) {
+  const rowId  = context + '-type-row-' + index;
+  const nameClass  = 'ct-name';
+  const shapeClass = 'ct-shape-input';
+
+  const shapeOptions = ALL_SHAPES.map(s => `
+    <label class="shape-pick${t.shape === s ? ' selected' : ''}" title="${s}">
+      <input type="radio" name="${rowId}-shape" value="${s}" class="${shapeClass}" ${t.shape === s ? 'checked' : ''} style="display:none;" onchange="onShapePick(this)">
+      ${SHAPE_PICKER_SVGS[s]}
+    </label>
+  `).join('');
+
+  const row = document.createElement('div');
+  row.className = 'type-editor-row';
+  row.dataset.index = index;
+  row.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px;">
+      <input type="text" class="modal-input ${nameClass}" value="${t.name}" maxlength="30" placeholder="Type name…" style="flex:1; font-size:12px;">
+      ${removable ? `<button onclick="removeTypeRow(this)" style="background:none; border:none; color:#c6530c; font-size:16px; cursor:pointer; flex-shrink:0; padding:0 4px; line-height:1;" title="Remove">×</button>` : ''}
+    </div>
+    <div class="shape-picker">${shapeOptions}</div>
+  `;
+  return row;
+}
+
+function onShapePick(radio) {
+  // Update selected state on siblings
+  const name = radio.name;
+  document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+    r.closest('.shape-pick').classList.toggle('selected', r === radio);
+  });
+}
+
+function removeTypeRow(btn) {
+  const row = btn.closest('.type-editor-row');
+  row.remove();
+  updateAddBtnState();
+}
+
+function updateAddBtnState() {
+  // Disable add button if 7 rows exist
+  ['ct-add-btn', 'et-add-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const context = id === 'ct-add-btn' ? 'create-type-rows' : 'edit-type-rows';
+    const count = document.getElementById(context)?.querySelectorAll('.type-editor-row').length || 0;
+    btn.disabled = count >= 7;
+    btn.style.opacity = count >= 7 ? '0.4' : '1';
+    btn.style.cursor  = count >= 7 ? 'not-allowed' : 'pointer';
+  });
+}
+
+// ── CREATE MODAL: type rows ───────────────────────────────────────────────────
+function buildCreateTypeRows() {
+  const container = document.getElementById('create-type-rows');
+  const section   = document.getElementById('create-types-section');
+  if (!container || !section) return;
+
+  // Show section only when phases have been defined
+  const count = parseInt(document.getElementById('create-poam-phases').value, 10);
+  section.style.display = count ? 'flex' : 'none';
+  if (!count) return;
+
+  // Seed with one blank row if empty
+  if (!container.children.length) {
+    container.appendChild(buildTypeRow({ name: '', shape: 'pentagon' }, 0, 'create', false));
+  }
+  updateAddBtnState();
+}
+
+function addCreateTypeRow() {
+  const container = document.getElementById('create-type-rows');
+  const count = container.querySelectorAll('.type-editor-row').length;
+  if (count >= 7) return;
+  const newType = { name: '', shape: ALL_SHAPES[count % ALL_SHAPES.length] };
+  container.appendChild(buildTypeRow(newType, count, 'create', true));
+  updateAddBtnState();
+}
+
+// Patch buildPhaseFields to also show/seed type rows
+const _origBuildPhaseFields = buildPhaseFields;
+buildPhaseFields = function() {
+  _origBuildPhaseFields();
+  buildCreateTypeRows();
+};
+
+// ── EDIT TYPES MODAL ─────────────────────────────────────────────────────────
+function openEditTypesModal() {
+  const poam = getActivePoam();
+  if (!poam) return;
+  const types = poam.types || DEFAULT_TYPES;
+
+  const container = document.getElementById('edit-type-rows');
+  container.innerHTML = '';
+  types.forEach((t, i) => container.appendChild(buildTypeRow(t, i, 'edit', types.length > 1)));
+  updateAddBtnState();
+  document.getElementById('edit-types-overlay').classList.add('open');
+}
+
+function addEditTypeRow() {
+  const container = document.getElementById('edit-type-rows');
+  const count = container.querySelectorAll('.type-editor-row').length;
+  if (count >= 7) return;
+  const newType = { name: '', shape: ALL_SHAPES[count % ALL_SHAPES.length] };
+  container.appendChild(buildTypeRow(newType, count, 'edit', true));
+  updateAddBtnState();
+}
+
+function closeEditTypesModal() {
+  document.getElementById('edit-types-overlay').classList.remove('open');
+}
+
+function handleEditTypesOverlayClick(e) {
+  if (e.target === document.getElementById('edit-types-overlay')) closeEditTypesModal();
+}
+
+function confirmEditTypes() {
+  const poam = getActivePoam();
+  if (!poam) return;
+
+  const rows = document.querySelectorAll('#edit-type-rows .type-editor-row');
+  const updated = [];
+  for (const row of rows) {
+    const name  = row.querySelector('.ct-name')?.value.trim();
+    const shape = row.querySelector('.ct-shape-input:checked')?.value;
+    if (!name) { row.querySelector('.ct-name')?.focus(); return; }
+    updated.push({ name, shape: shape || 'circle' });
+  }
+  if (!updated.length) return;
+
+  // Save and rebuild UI
+  poam.types = updated;
+  rebuildTypeUI();
+  renderEvents(); // re-render icons
+  closeEditTypesModal();
+}
+
+// ─── EXPORT TIMELINE AS 1920×1080 PNG ────────────────────────────────────────
+async function exportTimelinePNG() {
+  const btn = document.getElementById('btn-export');
+  const activePoam = getActivePoam();
+  if (!activePoam) { showToast('No active POAM to export.'); return; }
+  if (typeof html2canvas === 'undefined') { showToast('Export library not loaded.'); return; }
+
+  btn.textContent = 'EXPORTING…';
+  btn.disabled = true;
+
+  const TARGET_W      = 1920;
+  const TARGET_H      = 1080;
+  const BG_COLOR      = '#edf1f4';
+  const CAPTURE_SCALE = 2;
+  const V_PAD         = 32; // px padding above/below content in capture
+
+  const timelineCanvas = document.getElementById('timeline-canvas');
+  const timelineArea   = document.getElementById('timeline-area');
+  const wrapper        = document.getElementById('timeline-wrapper');
+
+  // ── 1. Expand to full width, measure content bounds ──────────────────────
+  const savedStyles = [
+    { el: wrapper,        overflow: wrapper.style.overflow,        width: wrapper.style.width },
+    { el: timelineCanvas, overflow: timelineCanvas.style.overflow, width: timelineCanvas.style.width },
+    { el: timelineArea,   overflow: timelineArea.style.overflow,   width: timelineArea.style.width },
+  ];
+  wrapper.style.overflow        = 'visible';
+  wrapper.style.width           = 'max-content';
+  timelineCanvas.style.overflow = 'visible';
+  timelineCanvas.style.width    = 'max-content';
+  timelineArea.style.overflow   = 'visible';
+  timelineArea.style.width      = 'max-content';
+
+  await new Promise(r => setTimeout(r, 100));
+
+  // Full content width (including cards that overflow right)
+  let maxRight = timelineCanvas.scrollWidth;
+  timelineCanvas.querySelectorAll('.event-card, .range-bar-label, .range-bar').forEach(el => {
+    const r = el.offsetLeft + el.offsetWidth;
+    if (r > maxRight) maxRight = r;
+  });
+  const fullW = maxRight + 60;
+
+  // Find vertical content bounds — measured while overflow is still unlocked
+  const timelineLine = timelineArea.querySelector('.timeline-line');
+  const lineTop = timelineLine ? timelineLine.offsetTop : timelineArea.offsetHeight / 2;
+
+  let minTop = lineTop;
+  let maxBot = lineTop + 2;
+  timelineArea.querySelectorAll('.event-card').forEach(card => {
+    const t = card.offsetTop;
+    const b = t + card.offsetHeight;
+    if (t < minTop) minTop = t;
+    if (b > maxBot) maxBot = b;
+  });
+  const firstTick = timelineArea.querySelector('.date-tick');
+  if (firstTick) {
+    const b = firstTick.offsetTop + firstTick.offsetHeight;
+    if (b > maxBot) maxBot = b;
+  }
+  const contentTop = Math.max(0, minTop - V_PAD);
+  const contentBot = maxBot + V_PAD;
+  const fullAreaH  = contentBot + 40; // explicit height, not scrollHeight (which is viewport-constrained)
+
+  // Restore styles
+  savedStyles.forEach(({ el, overflow, width }) => { el.style.overflow = overflow; el.style.width = width; });
+
+  try {
+    // ── 2. Capture FULL timelineArea (no y offset), crop manually on canvas ─
+    const captured = await html2canvas(timelineArea, {
+      backgroundColor: BG_COLOR,
+      useCORS:         true,
+      allowTaint:      true,
+      x:               0,
+      y:               0,
+      scrollX:         0,
+      scrollY:         0,
+      width:           fullW,
+      height:          fullAreaH,
+      windowWidth:     fullW + 400,
+      windowHeight:    fullAreaH + 400,
+      scale:           CAPTURE_SCALE,
+      logging:         false,
+      onclone: (cloneDoc) => {
+        const cloneArea   = cloneDoc.getElementById('timeline-area');
+        const cloneCanvas = cloneDoc.getElementById('timeline-canvas');
+        const cloneWrap   = cloneDoc.getElementById('timeline-wrapper');
+        const cloneMain   = cloneDoc.querySelector('main.main');
+
+        if (cloneArea)   { cloneArea.style.overflow   = 'visible'; cloneArea.style.width   = fullW + 'px'; cloneArea.style.height  = fullAreaH + 'px'; }
+        if (cloneCanvas) { cloneCanvas.style.overflow = 'visible'; cloneCanvas.style.width = fullW + 'px'; cloneCanvas.style.height = (fullAreaH + 36) + 'px'; }
+        if (cloneWrap)   { cloneWrap.style.overflow   = 'visible'; cloneWrap.style.width   = fullW + 'px'; cloneWrap.style.height   = (fullAreaH + 36) + 'px'; }
+        if (cloneMain)   { cloneMain.style.overflow   = 'visible'; cloneMain.style.height  = (fullAreaH + 36) + 'px'; }
+
+        // Flatten CSS custom properties per card
+        const liveCards  = timelineArea.querySelectorAll('.event-card');
+        const cloneCards = cloneArea?.querySelectorAll('.event-card');
+        if (cloneCards) {
+          liveCards.forEach((liveCard, i) => {
+            const cloneCard = cloneCards[i];
+            if (!cloneCard) return;
+            cloneCard.style.background = getComputedStyle(liveCard).backgroundColor;
+            const borderColor = getComputedStyle(liveCard).getPropertyValue('--card-border-color').trim()
+              || getComputedStyle(liveCard).borderColor;
+            cloneCard.style.boxShadow = `0 2px 6px rgba(0,0,0,0.07),0 0 0 1.5px ${borderColor||'#a8dce8'}`;
+            const liveH  = liveCard.querySelector('.event-card-header');
+            const cloneH = cloneCard.querySelector('.event-card-header');
+            if (liveH && cloneH) {
+              cloneH.style.background = liveH.style.background || getComputedStyle(liveH).backgroundColor;
+              cloneH.style.color      = liveH.style.color      || getComputedStyle(liveH).color;
+            }
+          });
+        }
+      }
+    });
+
+    // ── 3. Composite onto 1920×1080 — crop content region from full capture ─
+    const LEGEND_H = 52;
+    const out = document.createElement('canvas');
+    out.width  = TARGET_W;
+    out.height = TARGET_H;
+    const ctx  = out.getContext('2d');
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+
+    // Source region in captured canvas (2x scale)
+    const srcX = 0;
+    const srcY = Math.round(contentTop * CAPTURE_SCALE);
+    const srcW = captured.width;
+    const srcH = Math.round((contentBot - contentTop) * CAPTURE_SCALE);
+
+    // Scale to fill 1920 wide
+    const scaleF        = TARGET_W / srcW;
+    const timelineDrawH = Math.round(srcH * scaleF);
+
+    // Center the timeline+legend block vertically, with legend pinned to bottom
+    const availH = TARGET_H - LEGEND_H;
+    const offY   = Math.max(0, Math.round((availH - timelineDrawH) / 2));
+
+    ctx.drawImage(captured, srcX, srcY, srcW, srcH, 0, offY, TARGET_W, timelineDrawH);
+
+    // ── 4. Draw legend bar pinned to bottom ──────────────────────────────
+    const legY = TARGET_H - LEGEND_H;
+    ctx.fillStyle = '#f0f4f6';
+    ctx.fillRect(0, legY, TARGET_W, LEGEND_H);
+    ctx.fillStyle = '#c8d4d8';
+    ctx.fillRect(0, legY, TARGET_W, 1);
+
+    const SW = 11; // swatch size
+    function drawSwatch(x, y, color, label, shape, strokeOnly) {
+      ctx.save();
+      if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(x + SW/2, y + SW/2, SW/2, 0, Math.PI*2);
+        if (strokeOnly) { ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke(); }
+        else { ctx.fillStyle = color; ctx.fill(); }
+      } else if (shape === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x+SW/2, y); ctx.lineTo(x+SW, y+SW/2);
+        ctx.lineTo(x+SW/2, y+SW); ctx.lineTo(x, y+SW/2); ctx.closePath();
+        ctx.fillStyle = color; ctx.fill();
+      } else if (shape === 'star') {
+        const cx=x+SW/2, cy=y+SW/2, r1=SW/2, r2=SW/4;
+        ctx.beginPath();
+        for (let i=0;i<10;i++){const r=i%2===0?r1:r2,a=(i*Math.PI/5)-Math.PI/2;i===0?ctx.moveTo(cx+r*Math.cos(a),cy+r*Math.sin(a)):ctx.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a));}
+        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+      } else {
+        if (strokeOnly) { ctx.strokeStyle = '#b8b4ac'; ctx.lineWidth = 1.5; ctx.strokeRect(x+0.75, y+0.75, SW-1.5, SW-1.5); }
+        else { ctx.fillStyle = color; ctx.fillRect(x, y, SW, SW); }
+      }
+      ctx.restore();
+      ctx.fillStyle = '#3d5a62';
+      ctx.font = "500 11px Arial, sans-serif";
+      ctx.textAlign = 'left';
+      ctx.fillText(label, x + SW + 5, y + SW - 1);
+    }
+
+    function sectionTitle(label, x, y) {
+      ctx.font = "700 8.5px Arial, sans-serif";
+      ctx.fillStyle = '#2d4a52';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, x, y + 9);
+      ctx.fillStyle = '#c8d4d8';
+      ctx.fillRect(x + 75, y - 1, 2, 13);
+    }
+
+    // Row 1: Priority
+    const r1y = legY + 10;
+    sectionTitle('PRIORITY', 24, r1y);
+    const priorities = [
+      {color:'#c6530c',label:'Emergency'},{color:'#f5a04b',label:'Critical'},
+      {color:'#1d2333',label:'High'},{color:'#2e3e5c',label:'Medium-High'},
+      {color:'#8ca3bf',label:'Medium'},{color:'#c8d7e8',label:'Low'},
+      {color:'',label:'Lowest',strokeOnly:true},
+    ];
+    let px = 115;
+    priorities.forEach(({color,label,strokeOnly}) => {
+      drawSwatch(px, r1y, color, label, 'rect', strokeOnly);
+      ctx.font = "500 11px Arial, sans-serif";
+      px += ctx.measureText(label).width + 26;
+    });
+
+    // Row 2: Event Types from live DOM
+    const r2y = legY + 30;
+    sectionTitle('EVENT TYPE', 24, r2y);
+    let tx = 115;
+    document.querySelectorAll('#legend-type-items .legend-item').forEach(item => {
+      const label = item.textContent.trim();
+      const svg   = item.querySelector('svg');
+      let color = '#8ca3bf', shape = 'rect', strokeOnly = false;
+      if (svg) {
+        const filled = svg.querySelector('[fill]:not([fill="none"])');
+        const stroked = svg.querySelector('[stroke]');
+        color = filled?.getAttribute('fill') || '#8ca3bf';
+        if (svg.querySelector('circle')) shape = 'circle';
+        else if (svg.querySelector('polygon')) {
+          const pts = (svg.querySelector('polygon')?.getAttribute('points')||'').trim().split(/\s+/);
+          shape = pts.length <= 5 ? 'diamond' : 'star';
+        }
+        if (!filled && stroked) strokeOnly = true;
+      }
+      drawSwatch(tx, r2y, color, label, shape, strokeOnly);
+      ctx.font = "500 11px Arial, sans-serif";
+      tx += ctx.measureText(label).width + 26;
+    });
+
+    // Watermark
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillStyle = 'rgba(45,74,82,0.35)';
+    ctx.textAlign = 'right';
+    ctx.fillText('USEUCOM POAM · ' + activePoam.name, TARGET_W - 16, TARGET_H - 10);
+
+    // ── 5. Download ───────────────────────────────────────────────────────
+    const safeName = (activePoam.name || 'POAM').replace(/[^a-z0-9_\-]/gi, '_');
+    const link = document.createElement('a');
+    link.download = `POAM_${safeName}.png`;
+    link.href = out.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Exported to Downloads folder.');
+
+  } catch (err) {
+    console.error('Export failed:', err);
+    showToast('Export failed: ' + err.message);
+  } finally {
+    btn.textContent = 'EXPORT POAM';
+    btn.disabled = false;
+  }
+}
+</script>
+<!-- Validation toast -->
+<div class="validation-toast" id="validation-toast">
+  <span class="toast-icon">⚠️</span>
+  <span id="validation-toast-msg">Event Name and Date are required.</span>
+</div>
+
+</body>
+</html>
